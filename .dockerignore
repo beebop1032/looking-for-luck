@@ -1,0 +1,13 @@
+.git/
+.github/
+.idea/
+.claude/
+vendor/
+var/
+.env.local
+.env.*.local
+*.md
+.php-cs-fixer.cache
+.phpunit.cache
+Dockerfile
+compose.yaml

@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    # Persist the draw cache and saved grids between runs.
+    volumes:
+      - lottery-data:/app/var
+    environment:
+      # Optional: enables the AI assistant (app:euromillions:ask).
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+volumes:
+  lottery-data:
