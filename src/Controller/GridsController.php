@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Lottery\DuplicateGridException;
+use App\Lottery\GridStorageFullException;
 use App\Lottery\Lottery;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -59,8 +60,12 @@ final class GridsController extends AbstractPageController
                     // Invalid entries are skipped, like duplicates.
                 }
             }
-            $added = $lottery->grids()->addMany($grids);
-            $this->flash('success', 'flash.grids_saved', ['count' => \count($added)]);
+            try {
+                $added = $lottery->grids()->addMany($grids);
+                $this->flash('success', 'flash.grids_saved', ['count' => \count($added)]);
+            } catch (GridStorageFullException) {
+                $this->flash('error', 'flash.grids_full');
+            }
 
             return $this->redirectToRoute('grids', ['lottery' => $lottery->slug()]);
         }
@@ -71,6 +76,8 @@ final class GridsController extends AbstractPageController
             $this->flash('success', 'flash.grid_saved', ['id' => $saved->id, 'grid' => $grid->format()]);
         } catch (DuplicateGridException $e) {
             $this->flash('error', 'flash.grid_duplicate', ['id' => $e->existingId]);
+        } catch (GridStorageFullException) {
+            $this->flash('error', 'flash.grids_full');
         } catch (\InvalidArgumentException) {
             $game = $lottery->game();
             $this->flash('error', 'flash.grid_invalid_multiple', [

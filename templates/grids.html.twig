@@ -71,7 +71,7 @@
         <h2>{{ 'grids.storage_title'|trans }}</h2>
     </div>
     <div style="max-width: 66ch">
-        <p>{{ 'grids.storage'|trans }}</p>
+        <p>{{ (grids_in_browser ? 'grids.storage_browser' : 'grids.storage')|trans }}</p>
         <p class="small muted" style="margin-top: 12px">{{ 'grids.disclaimer'|trans }}</p>
     </div>
 </section>

@@ -1,0 +1,63 @@
+# Public deployment. The app listens on 127.0.0.1 only. In front of it,
+# either your own web server (Apache, nginx: see deploy/README.md), or the
+# bundled Caddy, which serves HTTPS on your domain with a free, automatically
+# renewed certificate: enable it with COMPOSE_PROFILES=https in .env.prod.
+#
+#   docker compose -f compose.yaml -f deploy/compose.prod.yaml --env-file .env.prod up -d --build
+#
+# See deploy/README.md. Settings come from .env.prod (copy deploy/.env.prod.example).
+services:
+  app:
+    # Only Caddy talks to the app; the host itself can reach it on 127.0.0.1.
+    ports: !override
+      - "127.0.0.1:${LFL_PORT:-8090}:8080"
+    environment:
+      # A stable secret, so that forms keep working across restarts.
+      - APP_SECRET=${APP_SECRET:?Set APP_SECRET in .env.prod}
+      # No accounts on a public site: each visitor keeps their grids in their own browser.
+      - LFL_GRIDS=${LFL_GRIDS:-browser}
+      - LFL_GA4_ID=${LFL_GA4_ID:-}
+      - LFL_COUNTRY=${LFL_COUNTRY:-}
+      - LFL_LOCALE=${LFL_LOCALE:-}
+      # The proxy in front (Caddy on the Docker network, or the host's web server through
+      # the Docker gateway) is trusted for its X-Forwarded-* headers (HTTPS, client IP).
+      - SYMFONY_TRUSTED_PROXIES=127.0.0.1/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: [https]
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - LFL_DOMAIN=${LFL_DOMAIN:-}
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+
+configs:
+  caddyfile:
+    content: |
+      {$$LFL_DOMAIN} {
+      	encode zstd gzip
+      	header {
+      		Strict-Transport-Security "max-age=31536000"
+      		X-Content-Type-Options "nosniff"
+      		X-Frame-Options "DENY"
+      		Referrer-Policy "strict-origin-when-cross-origin"
+      		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+      		-Server
+      	}
+      	reverse_proxy app:8080
+      }
+
+volumes:
+  caddy-data:
+  caddy-config:

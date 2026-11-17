@@ -20,6 +20,10 @@ parameters:
     # Country whose mandatory gambling warning is shown (fr, be…); empty = from the browser language region.
     app.country: '%env(default:app.default_country:LFL_COUNTRY)%'
     app.default_country: ''
+    # Where the web interface keeps "My grids": server (a file, shared by everyone who
+    # opens the app: a personal install) or browser (a cookie per visitor: a public site).
+    app.grids: '%env(default:app.default_grids:LFL_GRIDS)%'
+    app.default_grids: 'server'
     # Google Analytics 4 measurement ID (G-…) of your own deployment. Empty = no analytics,
     # no consent banner. When set, nothing is loaded until the visitor accepts.
     app.ga4_id: '%env(default:app.default_ga4_id:LFL_GA4_ID)%'
@@ -45,13 +49,20 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
-            # Built per lottery by LotteryRegistry, not a shared service.
+            # Built per lottery by LotteryRegistry, not shared services.
             - '../src/Lottery/Lottery.php'
+            - '../src/Lottery/FileGridStorage.php'
+            - '../src/Web/CookieGridStorage.php'
 
     # Must run before Symfony's resolver that would inject the raw {lottery} string.
     App\Web\LotteryValueResolver:
         tags:
             - { name: controller.argument_value_resolver, priority: 150 }
+
+    # The EuroMillions grids of the command line and the scheduled sync: always on the server.
+    App\Lottery\GridStore:
+        factory: ['App\Lottery\GridStore', 'inDirectory']
+        arguments: ['@App\Euromillions\EuromillionsGame', '%app.data_dir%']
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

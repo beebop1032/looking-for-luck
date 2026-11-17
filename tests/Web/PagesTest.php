@@ -194,6 +194,64 @@ final class PagesTest extends WebTestCase
         self::assertSelectorTextContains('.tag--gold', '18 combinations');
     }
 
+    public function testInBrowserModeEachVisitorKeepsTheirOwnGrids(): void
+    {
+        $_SERVER['LFL_GRIDS'] = 'browser';
+        try {
+            $crawler = $this->client->request('GET', '/euromillions/grids');
+            self::assertSelectorTextContains('main', 'In this browser only');
+            $this->client->submit($crawler->filter('form[method="post"][action="/euromillions/grids"]')->form(['grid' => '1 9 23 34 48 50 + 3 7 11']));
+
+            // Kept in a cookie of this browser, never on the server.
+            $cookie = $this->client->getCookieJar()->get('lfl_grids_euromillions');
+            self::assertNotNull($cookie);
+            self::assertTrue($cookie->isHttpOnly());
+            self::assertSame('1.1-9-23-34-48-50.3-7-11.'.date('Ymd'), $cookie->getValue());
+            self::assertFileDoesNotExist($this->dataDir.'/my-grids.json');
+
+            $this->client->followRedirect();
+            self::assertSelectorTextContains('.flash--success', 'Grid 1 saved');
+            self::assertSelectorTextContains('.tag--gold', '18 combinations');
+            $this->client->request('GET', '/');
+            self::assertSelectorTextContains('a.feature[href="/euromillions/grids"]', '1');
+
+            // Deleting the last grid removes the cookie.
+            $crawler = $this->client->request('GET', '/euromillions/grids');
+            $this->client->submit($crawler->filter('form[action="/euromillions/grids/1/delete"]')->form());
+            self::assertNull($this->client->getCookieJar()->get('lfl_grids_euromillions'));
+
+            // Another visitor (no cookie) sees nothing.
+            $this->client->getCookieJar()->clear();
+            $this->client->request('GET', '/euromillions/grids');
+            self::assertSelectorExists('.empty');
+
+            // A forged cookie is validated like a hand-edited file: invalid grids are dropped.
+            $this->client->getCookieJar()->set(new \Symfony\Component\BrowserKit\Cookie('lfl_grids_euromillions', '1.1-2-3-4-99.1-2.20260101_2.5-6-7-8-9.1-2.20260101_<script>'));
+            $this->client->request('GET', '/euromillions/grids');
+            self::assertCount(1, $this->client->getCrawler()->filter('main .block--wide .list__index'));
+        } finally {
+            unset($_SERVER['LFL_GRIDS']);
+        }
+    }
+
+    public function testInBrowserModeAFullCookieIsReported(): void
+    {
+        $_SERVER['LFL_GRIDS'] = 'browser';
+        try {
+            // Nearly 4 KB of the largest multiple grids already saved.
+            $big = implode('-', range(1, 10)).'.'.implode('-', range(1, 12)).'.20260101';
+            $this->client->getCookieJar()->set(new \Symfony\Component\BrowserKit\Cookie('lfl_grids_euromillions', implode('_', array_map(static fn (int $i): string => $i.'.'.$big, range(1, 70)))));
+
+            $crawler = $this->client->request('GET', '/euromillions/grids');
+            $this->client->submit($crawler->filter('form[method="post"][action="/euromillions/grids"]')->form(['grid' => '1 9 23 34 48 + 3 7']));
+            $this->client->followRedirect();
+
+            self::assertSelectorTextContains('.flash--error', 'No more room in this browser');
+        } finally {
+            unset($_SERVER['LFL_GRIDS']);
+        }
+    }
+
     public function testGroupListsEveryTicketAndSavesThemAll(): void
     {
         // Default: one simple grid (5 numbers + 2 stars) per person, all listed.

@@ -19,7 +19,7 @@ final class GridStoreTest extends TestCase
     protected function setUp(): void
     {
         $this->projectDir = sys_get_temp_dir().'/lfl-grid-store-'.bin2hex(random_bytes(6));
-        $this->store = new GridStore(new EuromillionsGame(), $this->projectDir.'/var/euromillions');
+        $this->store = GridStore::inDirectory(new EuromillionsGame(), $this->projectDir.'/var/euromillions');
     }
 
     protected function tearDown(): void

@@ -18,6 +18,7 @@ final class Lottery
     public function __construct(
         public readonly LotteryDefinition $definition,
         private readonly string $dataDir,
+        private readonly ?GridStorageFactory $gridStorages = null,
     ) {
     }
 
@@ -78,7 +79,10 @@ final class Lottery
 
     public function grids(): GridStore
     {
-        return $this->grids ??= new GridStore($this->game(), $this->dataDir);
+        return $this->grids ??= new GridStore(
+            $this->game(),
+            $this->gridStorages?->create($this->slug(), $this->dataDir) ?? new FileGridStorage($this->dataDir),
+        );
     }
 
     public function gridInput(): GridInput

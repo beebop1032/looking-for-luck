@@ -5,6 +5,8 @@
 vendor/
 var/
 .env.local
+.env.prod
+deploy/
 .env.*.local
 *.md
 .php-cs-fixer.cache

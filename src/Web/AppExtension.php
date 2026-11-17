@@ -48,6 +48,7 @@ final class AppExtension extends AbstractExtension implements GlobalsInterface
         private readonly string $country = '',
         #[Autowire('%app.ga4_id%')]
         private readonly string $ga4Id = '',
+        private readonly ?BrowserGrids $browserGrids = null,
     ) {
     }
 
@@ -80,6 +81,7 @@ final class AppExtension extends AbstractExtension implements GlobalsInterface
             'repo_url' => $this->repositoryUrl,
             'app_version' => $this->version,
             // Only a well-formed measurement ID reaches the page (it is printed in a script).
+            'grids_in_browser' => $this->browserGrids?->enabled() ?? false,
             'ga4_id' => 1 === preg_match('/^G-[A-Z0-9]{4,20}$/', $this->ga4Id) ? $this->ga4Id : null,
         ];
     }

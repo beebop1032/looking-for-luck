@@ -27,6 +27,7 @@ final class LotteryRegistry
         string $dataRoot,
         #[Autowire('%app.planned_lotteries%')]
         private readonly array $planned = [],
+        ?GridStorageFactory $gridStorages = null,
     ) {
         foreach ($definitions as $definition) {
             $slug = $definition->slug();
@@ -36,7 +37,7 @@ final class LotteryRegistry
             if (isset($this->lotteries[$slug])) {
                 throw new \LogicException(\sprintf('Two lotteries use the slug "%s".', $slug));
             }
-            $this->lotteries[$slug] = new Lottery($definition, rtrim($dataRoot, '/').'/'.$slug);
+            $this->lotteries[$slug] = new Lottery($definition, rtrim($dataRoot, '/').'/'.$slug, $gridStorages);
         }
     }
 

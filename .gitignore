@@ -3,6 +3,8 @@
 /.env.local
 /.env.local.php
 /.env.*.local
+# Production settings of a deployment (secret): see deploy/.env.prod.example
+/.env.prod
 /config/secrets/prod/prod.decrypt.private.php
 /public/bundles/
 /var/

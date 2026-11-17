@@ -39,8 +39,11 @@ draw and checks your saved grids. Your data stays on your machine, in the
 - Audience measurement for your own deployment: `LFL_GA4_ID=G-XXXXXXX`
   adds Google Analytics 4 behind a consent banner (nothing is loaded before
   the visitor accepts). Unset, there is no tracking and no banner.
-- The interface has no login: keep it on your machine or home network, not
-  on the open internet.
+- The interface has no login: by default, everyone who opens it shares the
+  same saved grids, which is right on your machine or home network. To put it
+  on the internet, see [deploy/README.md](deploy/README.md): HTTPS on your
+  domain, and each visitor's grids kept in their own browser
+  (`LFL_GRIDS=browser`).
 
 ## ✨ What's inside
 

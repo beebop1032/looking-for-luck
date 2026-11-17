@@ -4,26 +4,31 @@ declare(strict_types=1);
 
 namespace App\Lottery;
 
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-
 /**
- * "My grids": local storage (JSON in the lottery's data directory) and checking
- * against draws.
+ * "My grids": the grids a user plays, and checking them against draws.
  *
- * Security: atomic writes, content is systematically revalidated on read
- * (ranges, types) — a hand-edited file cannot inject invalid data into the
- * application.
+ * Where they are kept is up to the GridStorage (a file on the server, or a
+ * cookie in the visitor's browser). Security: everything read back is
+ * revalidated (ranges, types), so a hand-edited file or a forged cookie
+ * cannot inject invalid data into the application.
  *
- * Concurrency: the web interface and the scheduled sync both write the file,
- * so every read-modify-write holds an exclusive lock for its whole duration.
+ * @phpstan-import-type GridRecord from GridStorage
  */
 final class GridStore
 {
     public function __construct(
         private readonly LotteryGame $game,
-        #[Autowire('%app.data_dir%')]
-        private readonly string $dataDir,
+        private readonly GridStorage $storage,
     ) {
+    }
+
+    /**
+     * Grids kept in a lottery's data directory, as the command line and the
+     * scheduled sync use them.
+     */
+    public static function inDirectory(LotteryGame $game, string $dataDir): self
+    {
+        return new self($game, new FileGridStorage($dataDir));
     }
 
     /**
@@ -31,25 +36,7 @@ final class GridStore
      */
     public function all(): array
     {
-        $file = $this->filePath();
-        if (!is_file($file)) {
-            return [];
-        }
-
-        $raw = @file_get_contents($file);
-        if (false === $raw) {
-            return [];
-        }
-
-        try {
-            $decoded = json_decode($raw, true, 8, \JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return [];
-        }
-
-        if (!\is_array($decoded)) {
-            return [];
-        }
+        $decoded = $this->storage->load();
 
         $grids = [];
         foreach ($decoded as $item) {
@@ -94,6 +81,7 @@ final class GridStore
      * @return list<SavedGrid> the grids actually added
      *
      * @throws \InvalidArgumentException when a grid is not valid for this game
+     * @throws GridStorageFullException when the storage cannot hold them all (nothing is saved)
      */
     public function addMany(array $grids): array
     {
@@ -244,23 +232,15 @@ final class GridStore
      */
     private function mutate(callable $change): mixed
     {
-        $lock = fopen($this->filePath().'.lock', 'c');
-        if (false === $lock || !flock($lock, \LOCK_EX)) {
-            throw new \RuntimeException('Unable to lock the grids file.');
-        }
-
-        try {
+        return $this->storage->exclusively(function () use ($change): mixed {
             $before = $this->all();
             [$after, $result] = $change($before);
             if ($after !== $before) {
-                $this->write($after);
+                $this->storage->save(array_map(self::record(...), $after));
             }
 
             return $result;
-        } finally {
-            flock($lock, \LOCK_UN);
-            fclose($lock);
-        }
+        });
     }
 
     /**
@@ -271,38 +251,18 @@ final class GridStore
         return 1 + array_reduce($grids, static fn (int $max, SavedGrid $g): int => max($max, $g->id), 0);
     }
 
-    private function filePath(): string
-    {
-        $dir = $this->dataDir;
-        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-            throw new \RuntimeException(\sprintf('Unable to create "%s".', $dir));
-        }
-
-        return $dir.'/my-grids.json';
-    }
-
     /**
-     * @param list<SavedGrid> $grids
+     * @return GridRecord
      */
-    private function write(array $grids): void
+    private static function record(SavedGrid $g): array
     {
-        $payload = array_map(static fn (SavedGrid $g): array => [
+        return [
             'id' => $g->id,
             'numbers' => $g->grid->main,
             'stars' => $g->grid->bonus,
             'createdAt' => $g->createdAt->format('Y-m-d'),
             'lastDrawChecked' => $g->lastDrawChecked?->format('Y-m-d'),
-        ], $grids);
-
-        $file = $this->filePath();
-        $tmp = $file.'.tmp';
-
-        if (false === file_put_contents($tmp, json_encode($payload, \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT))) {
-            throw new \RuntimeException('Unable to write the grids file.');
-        }
-        if (!rename($tmp, $file)) {
-            throw new \RuntimeException('Unable to write the grids file.');
-        }
+        ];
     }
 
     private function sanitize(mixed $item): ?SavedGrid
