@@ -258,6 +258,47 @@ final class PagesTest extends WebTestCase
         self::assertSelectorTextContains('h1', $statsTitle);
     }
 
+    public function testNoAnalyticsUnlessTheDeploymentAsksForIt(): void
+    {
+        $this->client->request('GET', '/');
+
+        self::assertSelectorNotExists('[data-consent]');
+        self::assertSelectorNotExists('[data-consent-open]');
+        self::assertStringNotContainsString('googletagmanager', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testAnalyticsWaitForConsent(): void
+    {
+        $_SERVER['LFL_GA4_ID'] = 'G-TEST1234';
+        try {
+            $this->client->request('GET', '/euromillions/stats?lang=fr');
+        } finally {
+            unset($_SERVER['LFL_GA4_ID']);
+        }
+        $html = (string) $this->client->getResponse()->getContent();
+
+        // A banner (hidden until the script shows it), and a footer link to change one's mind.
+        self::assertSelectorExists('[data-consent][hidden] [data-consent-choice="granted"]');
+        self::assertSelectorExists('[data-consent-choice="denied"]');
+        self::assertSelectorTextContains('[data-consent]', 'Google Analytics');
+        self::assertSelectorExists('.footer [data-consent-open]');
+        self::assertStringContainsString('"G-TEST1234"', $html);
+        // The tag is only injected by the script, never as a static <script src>.
+        self::assertSelectorNotExists('script[src*="googletagmanager"]');
+    }
+
+    public function testAMalformedAnalyticsIdIsIgnored(): void
+    {
+        $_SERVER['LFL_GA4_ID'] = 'G-1"</script><script>alert(1)';
+        try {
+            $this->client->request('GET', '/');
+        } finally {
+            unset($_SERVER['LFL_GA4_ID']);
+        }
+
+        self::assertSelectorNotExists('[data-consent]');
+    }
+
     public function testEveryPageCarriesTheGamblingWarning(): void
     {
         $this->client->request('GET', '/', [], [], ['HTTP_ACCEPT_LANGUAGE' => 'fr-FR,fr;q=0.9']);

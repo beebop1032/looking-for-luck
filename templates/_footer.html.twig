@@ -5,6 +5,7 @@
         <a href="{{ repo_url }}/blob/main/CONTRIBUTING.md">{{ 'footer.contribute'|trans }}</a>
         <a href="{{ repo_url }}/issues/new">{{ 'footer.report'|trans }}</a>
         <a href="{{ repo_url }}/blob/main/LICENSE">{{ 'footer.license'|trans }}</a>
+        {% if ga4_id %}<button type="button" class="footer__link" data-consent-open>{{ 'footer.cookies'|trans }}</button>{% endif %}
         <span>{{ app_version }}</span>
     </nav>
 </footer>

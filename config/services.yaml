@@ -20,6 +20,10 @@ parameters:
     # Country whose mandatory gambling warning is shown (fr, be…); empty = from the browser language region.
     app.country: '%env(default:app.default_country:LFL_COUNTRY)%'
     app.default_country: ''
+    # Google Analytics 4 measurement ID (G-…) of your own deployment. Empty = no analytics,
+    # no consent banner. When set, nothing is loaded until the visitor accepts.
+    app.ga4_id: '%env(default:app.default_ga4_id:LFL_GA4_ID)%'
+    app.default_ga4_id: ''
 
     # On the roadmap, waiting for a contributor (shown in the web interface).
     app.planned_lotteries:

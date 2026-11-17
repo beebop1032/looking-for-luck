@@ -36,6 +36,9 @@ draw and checks your saved grids. Your data stays on your machine, in the
 `lottery-data` volume.
 
 - Another port: `LFL_PORT=9000 docker compose up -d`
+- Audience measurement for your own deployment: `LFL_GA4_ID=G-XXXXXXX`
+  adds Google Analytics 4 behind a consent banner (nothing is loaded before
+  the visitor accepts). Unset, there is no tracking and no banner.
 - The interface has no login: keep it on your machine or home network, not
   on the open internet.
 

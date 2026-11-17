@@ -46,6 +46,8 @@ final class AppExtension extends AbstractExtension implements GlobalsInterface
         private readonly string $version,
         #[Autowire('%app.country%')]
         private readonly string $country = '',
+        #[Autowire('%app.ga4_id%')]
+        private readonly string $ga4Id = '',
     ) {
     }
 
@@ -77,6 +79,8 @@ final class AppExtension extends AbstractExtension implements GlobalsInterface
             'languages' => array_intersect_key(self::LANGUAGE_NAMES, array_flip($this->locales)),
             'repo_url' => $this->repositoryUrl,
             'app_version' => $this->version,
+            // Only a well-formed measurement ID reaches the page (it is printed in a script).
+            'ga4_id' => 1 === preg_match('/^G-[A-Z0-9]{4,20}$/', $this->ga4Id) ? $this->ga4Id : null,
         ];
     }
 

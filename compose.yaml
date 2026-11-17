@@ -13,6 +13,8 @@ services:
       # Optional: language of the command-line output (en, fr, nl, es, de).
       - LFL_LOCALE=${LFL_LOCALE:-}
       - LFL_COUNTRY=${LFL_COUNTRY:-}
+      # Optional: your own Google Analytics 4 ID (G-…), with a consent banner.
+      - LFL_GA4_ID=${LFL_GA4_ID:-}
     init: true
     restart: unless-stopped
 

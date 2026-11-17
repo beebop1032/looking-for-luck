@@ -1,0 +1,77 @@
+{# Google Analytics 4, only for a deployment that sets LFL_GA4_ID, and only
+   once the visitor has accepted: before that, nothing is loaded from Google
+   and no cookie is set. The choice is kept in localStorage; the "Cookies"
+   link of the footer reopens the banner, and refusing removes GA cookies. #}
+<div class="consent" data-consent hidden role="region" aria-label="{{ 'consent.title'|trans }}">
+    <div class="consent__inner wrap">
+        <p>{{ 'consent.text'|trans }}</p>
+        <div class="consent__actions">
+            <button type="button" class="btn btn--ghost btn--sm" data-consent-choice="denied">{{ 'consent.refuse'|trans }}</button>
+            <button type="button" class="btn btn--sm" data-consent-choice="granted">{{ 'consent.accept'|trans }}</button>
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        var id = {{ ga4_id|json_encode|raw }};
+        var key = 'lfl-consent';
+        var banner = document.querySelector('[data-consent]');
+
+        function stored() {
+            try { return localStorage.getItem(key); } catch (e) { return null; }
+        }
+        function store(choice) {
+            try { localStorage.setItem(key, choice); } catch (e) {}
+        }
+        function loadAnalytics() {
+            if (window.gtag) return;
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = function () { window.dataLayer.push(arguments); };
+            window.gtag('js', new Date());
+            window.gtag('config', id);
+            var script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+            document.head.appendChild(script);
+        }
+        function removeAnalyticsCookies() {
+            var host = location.hostname, parts = host.split('.');
+            var domains = ['', host, '.' + host, '.' + parts.slice(-2).join('.')];
+            document.cookie.split(';').forEach(function (cookie) {
+                var name = cookie.split('=')[0].trim();
+                if (name.indexOf('_ga') !== 0) return;
+                domains.forEach(function (domain) {
+                    document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + (domain ? '; domain=' + domain : '');
+                });
+            });
+        }
+
+        var choice = stored();
+        if (choice === 'granted') {
+            loadAnalytics();
+        } else if (choice !== 'denied') {
+            banner.hidden = false;
+        }
+
+        document.addEventListener('click', function (event) {
+            if (event.target.closest('[data-consent-open]')) {
+                banner.hidden = false;
+                return;
+            }
+            var button = event.target.closest('[data-consent-choice]');
+            if (!button) return;
+            var next = button.dataset.consentChoice;
+            store(next);
+            banner.hidden = true;
+            if (next === 'granted') {
+                loadAnalytics();
+            } else if (window.gtag) {
+                // Consent withdrawn: forget the cookies and stop the tag already running.
+                removeAnalyticsCookies();
+                location.reload();
+            } else {
+                removeAnalyticsCookies();
+            }
+        });
+    })();
+</script>
