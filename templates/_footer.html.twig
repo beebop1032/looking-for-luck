@@ -1,0 +1,10 @@
+<footer class="footer">
+    <p>{{ 'footer.honest'|trans }}{% if lottery is defined and lottery %} {{ 'footer.verify'|trans({site: lottery.definition.officialUrl|replace({'https://': '', 'http://': ''})}) }}{% endif %}</p>
+    <nav aria-label="{{ 'footer.project'|trans }}">
+        <a href="{{ repo_url }}">GitHub</a>
+        <a href="{{ repo_url }}/blob/main/CONTRIBUTING.md">{{ 'footer.contribute'|trans }}</a>
+        <a href="{{ repo_url }}/issues/new">{{ 'footer.report'|trans }}</a>
+        <a href="{{ repo_url }}/blob/main/LICENSE">{{ 'footer.license'|trans }}</a>
+        <span>{{ app_version }}</span>
+    </nav>
+</footer>

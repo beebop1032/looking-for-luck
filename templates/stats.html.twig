@@ -1,0 +1,117 @@
+{% extends '_lottery.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% set shape = lottery.definition.bonusShape %}
+{% block title %}{{ 'stats.title'|trans }} – {{ lottery.name }}{% endblock %}
+{% block stage_title %}{{ 'stats.title'|trans }}{% endblock %}
+{% block stage_lead %}{% if draws is not empty %}{{ 'stats.range'|trans({count: draws|length|integer, from: draws|first.date|format_date('long'), to: draws|last.date|format_date('long')}) }}{% else %}{{ 'stats.no_draw_in_range'|trans }}{% endif %}{% endblock %}
+{% block content %}
+<section class="block block--wide">
+    <form class="controls">
+        <label>{{ 'stats.from'|trans }} <input type="date" name="from" value="{{ from|date('Y-m-d') }}" min="{{ first|date('Y-m-d') }}" max="{{ last|date('Y-m-d') }}"></label>
+        <label>{{ 'stats.to'|trans }} <input type="date" name="to" value="{{ to|date('Y-m-d') }}" min="{{ first|date('Y-m-d') }}" max="{{ last|date('Y-m-d') }}"></label>
+        <button class="btn">{{ 'stats.apply'|trans }}</button>
+    </form>
+    <p class="presets">
+        {% for key, range in presets %}
+            {% set active = range.from|date('Y-m-d') == from|date('Y-m-d') and range.to|date('Y-m-d') == to|date('Y-m-d') %}
+            <a class="tag{{ active ? ' tag--active' }}" href="{{ path('stats', {lottery: lottery.slug, from: range.from|date('Y-m-d'), to: range.to|date('Y-m-d')}) }}" {% if active %}aria-current="true"{% endif %}>{{ ('stats.preset_' ~ key)|trans({date: range.from|format_date('medium')}) }}</a>
+        {% endfor %}
+    </p>
+</section>
+
+{% if not enough %}
+    <section class="block block--wide empty"><p>{{ 'stats.not_enough'|trans }}</p></section>
+{% else %}
+{% set verdictOk = mainTest.compatible and bonusTest.compatible %}
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'stats.random_title'|trans }}</h2>
+        <p>{{ 'stats.pvalue_help'|trans }}</p>
+    </div>
+    <div>
+        <div class="verdict {{ verdictOk ? '' : 'verdict--warn' }}">
+            <span class="verdict__seal" aria-hidden="true">{{ verdictOk ? '✓' : '!' }}</span>
+            <div>
+                <h3>{{ verdictOk ? 'stats.ok_title'|trans : 'stats.warn_title'|trans }}</h3>
+                <p>{{ verdictOk ? 'stats.ok_text'|trans : 'stats.warn_text'|trans }}</p>
+            </div>
+        </div>
+        <dl class="figures" style="margin-top: 24px">
+            <div class="figure"><dt>{{ 'stats.chi_numbers'|trans({dof: mainTest.degreesOfFreedom}) }}</dt><dd>{{ mainTest.statistic|num(1) }}<small>{{ 'stats.pvalue'|trans({value: mainTest.pValue|num(3)}) }}</small></dd></div>
+            <div class="figure"><dt>{{ 'stats.chi_bonus'|trans({bonus: bonus_label(lottery)|capitalize, dof: bonusTest.degreesOfFreedom}) }}</dt><dd>{{ bonusTest.statistic|num(1) }}<small>{{ 'stats.pvalue'|trans({value: bonusTest.pValue|num(3)}) }}</small></dd></div>
+        </dl>
+    </div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'stats.heatmap'|trans }}</h2>
+        <p>{{ 'stats.heatmap_help'|trans({mean: main[0].expected|num(0)}) }}</p>
+    </div>
+    <div>
+        <div class="heat">
+            {% for c in main %}
+                <div class="heat__cell{{ c.t > 0.4 ? ' is-dark' }}" style="--t: {{ c.t|round(3) }}" title="{{ 'stats.cell_title'|trans({value: c.value, count: c.count}) }}">{{ c.value }}<small>{{ c.count }}</small></div>
+            {% endfor %}
+        </div>
+        <h3 class="small" style="margin: 22px 0 0; font-weight: 650">{{ bonus_label(lottery)|capitalize }}{% if rulesSince %} <span class="muted" style="font-weight: 400">{{ 'stats.rules_since'|trans({count: ruleDrawCount|integer, date: rulesSince|format_date('long')}) }}</span>{% endif %}</h3>
+        <div class="heat heat--bonus">
+            {% for c in bonus %}
+                <div class="heat__cell{{ c.t > 0.4 ? ' is-dark' }}" style="--t: {{ c.t|round(3) }}" title="{{ 'stats.cell_title'|trans({value: c.value, count: c.count}) }}">{{ c.value }}<small>{{ c.count }}</small></div>
+            {% endfor %}
+        </div>
+        <div class="heat-scale"><span>{{ 'stats.legend_less'|trans }}</span><i></i><span>{{ 'stats.legend_more'|trans }}</span></div>
+    </div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'stats.extremes_title'|trans }}</h2>
+        <p>{{ 'stats.extremes_text'|trans }}</p>
+    </div>
+    <div class="cols">
+        <div>
+            <h3>{{ 'stats.most'|trans }}</h3>
+            <div class="ranking">{% for n, count in hot %}<div class="rank">{{ ui.ball(n) }}{{ ui.bar(count / maxMain) }}<span class="rank__value">{{ count }}</span></div>{% endfor %}</div>
+        </div>
+        <div>
+            <h3>{{ 'stats.least'|trans }}</h3>
+            <div class="ranking">{% for n, count in cold %}<div class="rank">{{ ui.ball(n) }}{{ ui.bar(count / maxMain, 'muted') }}<span class="rank__value">{{ count }}</span></div>{% endfor %}</div>
+        </div>
+    </div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'stats.overdue'|trans }}</h2>
+        <p>{{ 'stats.overdue_help'|trans({gap: mainAverageGap}) }}</p>
+    </div>
+    <div class="ranking">{% for n, gap in mainGaps %}<div class="rank">{{ ui.ball(n) }}{{ ui.bar(gap / maxGap, 'gold') }}<span class="rank__value">{{ gap }}</span></div>{% endfor %}</div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ bonus_label(lottery)|capitalize }}</h2>
+        <p>{{ 'stats.bonus_text'|trans({gap: bonusAverageGap}) }}</p>
+    </div>
+    <div class="cols">
+        <div>
+            <h3>{{ 'stats.most'|trans }}</h3>
+            <div class="ranking">{% for n, count in hotBonus %}<div class="rank">{{ ui.bonus(n, shape) }}{{ ui.bar(count / maxBonus, 'gold') }}<span class="rank__value">{{ count }}</span></div>{% endfor %}</div>
+        </div>
+        <div>
+            <h3>{{ 'stats.bonus_absence'|trans }}</h3>
+            <div class="ranking">{% for n, gap in bonusGaps %}<div class="rank">{{ ui.bonus(n, shape) }}{{ ui.bar(gap / maxBonusGap, 'muted') }}<span class="rank__value">{{ gap }}</span></div>{% endfor %}</div>
+        </div>
+    </div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'stats.pairs'|trans }}</h2>
+        <p>{{ 'stats.pairs_text'|trans }}</p>
+    </div>
+    <div class="ranking">{% for p in pairs %}<div class="rank"><span class="balls balls--sm"><span class="ball d{{ p.pair[0] // 10 }}">{{ p.pair[0] }}</span><span class="ball d{{ p.pair[1] // 10 }}">{{ p.pair[1] }}</span></span>{{ ui.bar(p.count / pairs[0].count) }}<span class="rank__value">{{ p.count }}</span></div>{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

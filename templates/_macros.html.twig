@@ -1,0 +1,48 @@
+{# Lottery balls (coloured by tens) and bonus numbers. With `against`, what
+   doesn't match fades. With `drop`, the balls land one after the other. #}
+{% macro balls(grid, shape = 'star', against = null, size = '', drop = false) %}
+    <span class="balls {{ size ? 'balls--' ~ size }}{{ against ? ' balls--compare' }}{{ drop ? ' balls--drop' }}">
+        {%- for n in grid.main -%}
+            <span class="ball d{{ n // 10 }}{{ against and n in against.main ? ' hit' }}" style="--i: {{ loop.index0 }}">{{ n }}</span>
+        {%- endfor -%}
+        <span class="balls__sep"></span>
+        {%- for n in grid.bonus -%}
+            {%- if shape == 'star' -%}
+                <span class="star{{ against and n in against.bonus ? ' hit' }}" style="--i: {{ grid.main|length + loop.index0 }}"><span>{{ n }}</span></span>
+            {%- else -%}
+                <span class="ball ball--bonus{{ against and n in against.bonus ? ' hit' }}" style="--i: {{ grid.main|length + loop.index0 }}">{{ n }}</span>
+            {%- endif -%}
+        {%- endfor -%}
+    </span>
+{% endmacro %}
+
+{% macro ball(n) %}<span class="balls balls--sm"><span class="ball d{{ n // 10 }}">{{ n }}</span></span>{% endmacro %}
+
+{% macro bonus(n, shape) %}<span class="balls balls--sm">{% if shape == 'star' %}<span class="star"><span>{{ n }}</span></span>{% else %}<span class="ball ball--bonus">{{ n }}</span>{% endif %}</span>{% endmacro %}
+
+{% macro bar(ratio, tone = '') %}
+    <span class="rank__bar {{ tone ? 'rank__bar--' ~ tone }}"><span style="width: {{ (max(0, min(1, ratio)) * 100)|round(1) }}%"></span></span>
+{% endmacro %}
+
+{% macro money(amount, decimals = 2) %}
+    <span class="{{ amount < 0 ? 'neg' : (amount > 0 ? 'pos') }}">{{ amount|money(decimals, true) }}</span>
+{% endmacro %}
+
+{% macro countdown(lottery) %}
+    {% set next = lottery.nextDraw %}
+    <span class="countdown__value" data-countdown="{{ next|date('c') }}" data-day="{{ 'countdown.day'|trans }}">{{ next|format_datetime(pattern: 'EEE HH:mm', timezone: lottery.game.drawTimezone) }}</span>
+{% endmacro %}
+
+{# A probability for humans: a percentage when it is not tiny, "1 in N" otherwise. #}
+{# Non-breaking spaces: a chance never wraps over two lines ("> 99,9 %", "1 sur 134 460"). #}
+{% macro chance(p) %}
+    {%- if p > 0.999 -%}
+        > {{ 99.9|num(1) }} %
+    {%- elseif p >= 0.01 -%}
+        {{ (p * 100)|num(1) }} %
+    {%- elseif p > 0 -%}
+        {{ 'budget.one_in'|trans({odds: (1 / p)|round|integer})|replace({' ': ' '}) }}
+    {%- else -%}
+        0 %
+    {%- endif -%}
+{% endmacro %}

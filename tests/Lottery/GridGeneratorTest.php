@@ -57,4 +57,19 @@ final class GridGeneratorTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->generator->generate(0);
     }
+
+    public function testKeepsTheRejectedGridsWithTheirReasons(): void
+    {
+        // Reject every grid made only of numbers up to 31 ("birthday" grids):
+        // frequent enough that some get rejected over a few hundred grids.
+        $result = $this->generator->generate(300, new PopularityFilter($this->game));
+
+        self::assertGreaterThan(0, $result['rejectedTotal']);
+        self::assertLessThanOrEqual(30, \count($result['rejectedGrids']));
+        self::assertSame(min(30, $result['rejectedTotal']), \count($result['rejectedGrids']));
+        foreach ($result['rejectedGrids'] as $rejected) {
+            self::assertNotSame([], $rejected['reasons']);
+            self::assertTrue((new PopularityFilter($this->game))->isPopular($rejected['grid']));
+        }
+    }
 }

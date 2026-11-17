@@ -1,0 +1,5 @@
+# Every hour, app:sync looks at each lottery's draw schedule and downloads
+# only when a draw has taken place and is not known yet (results usually
+# reach the data source within an hour or two). Saved grids are checked right
+# after. The container runs with TZ=Europe/Paris.
+15 * * * *  php /app/bin/console app:sync --no-ansi

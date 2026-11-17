@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Euromillions\DrawRepository;
-use App\Euromillions\GridStore;
+use App\Euromillions\EuromillionsGame;
+use App\Intl\Format;
+use App\Lottery\DuplicateGridException;
+use App\Lottery\GridInput;
+use App\Lottery\GridStore;
 use App\Lottery\PrizeTable;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -20,10 +24,14 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class EuromillionsGridsCommand extends Command
 {
+    use TranslatesOutput;
+
     public function __construct(
         private readonly GridStore $store,
         private readonly DrawRepository $repository,
         private readonly PrizeTable $prizeTable,
+        private readonly GridInput $gridInput,
+        private readonly EuromillionsGame $game,
     ) {
         parent::__construct();
     }
@@ -61,23 +69,23 @@ HELP);
     {
         $grids = $this->store->all();
         if ([] === $grids) {
-            $io->info('No saved grids. Add one: app:euromillions:grids add "1 9 23 34 48 + 3 7"');
+            $io->info($this->t('grids.none', ['command' => 'app:euromillions:grids add "1 9 23 34 48 + 3 7"']));
 
             return Command::SUCCESS;
         }
 
-        $io->title(\sprintf('My grids (%d)', \count($grids)));
-        $rows = [];
+        Ui::banner($io, $this->t('grids.title', ['count' => \count($grids)]));
         foreach ($grids as $saved) {
-            $rows[] = [
+            $io->writeln(\sprintf(
+                '  <fg=gray>#%-3d</> %s   <fg=gray>%s</>',
                 $saved->id,
-                $saved->grid->formatMain(),
-                $saved->grid->formatBonus(),
-                $saved->createdAt->format('Y-m-d'),
-                $saved->lastCheckedAt?->format('Y-m-d') ?? 'never',
-            ];
+                Ui::grid($saved->grid),
+                null !== $saved->lastDrawChecked
+                    ? $this->t('grids.saved_checked', ['saved' => Format::date($saved->createdAt), 'checked' => Format::date($saved->lastDrawChecked)])
+                    : $this->t('grids.saved_never', ['saved' => Format::date($saved->createdAt)]),
+            ));
+            $io->newLine();
         }
-        $io->table(['Id', 'Numbers', 'Stars', 'Created', 'Checked'], $rows);
 
         return Command::SUCCESS;
     }
@@ -85,33 +93,31 @@ HELP);
     private function addGrid(SymfonyStyle $io, ?string $value): int
     {
         if (null === $value || '' === trim($value)) {
-            $io->error('Expected format: app:euromillions:grids add "1 9 23 34 48 + 3 7"');
+            $io->error($this->t('grids.expected_format', ['command' => 'app:euromillions:grids add "1 9 23 34 48 + 3 7"']));
 
             return Command::INVALID;
         }
-
-        if (1 !== preg_match('/^\s*(\d{1,2}(?:[\s,]+\d{1,2}){4})\s*\+\s*(\d{1,2}(?:[\s,]+\d{1,2}){1})\s*$/', $value, $m)) {
-            $io->error('Invalid format. Expected: 5 numbers, a "+", then 2 stars. Example: "1 9 23 34 48 + 3 7"');
-
-            return Command::INVALID;
-        }
-
-        $numbers = array_map(intval(...), preg_split('/[\s,]+/', trim($m[1])) ?: []);
-        $stars = array_map(intval(...), preg_split('/[\s,]+/', trim($m[2])) ?: []);
 
         try {
-            $saved = $this->store->add($numbers, $stars);
-        } catch (\InvalidArgumentException $e) {
-            $io->error($e->getMessage());
+            $grid = $this->gridInput->parse($value, true);
+            $saved = $this->store->add($grid->main, $grid->bonus);
+        } catch (DuplicateGridException $e) {
+            $io->error($this->t('grids.duplicate', ['id' => $e->existingId]));
+
+            return Command::INVALID;
+        } catch (\InvalidArgumentException) {
+            $io->error($this->t('grids.invalid', ['example' => GridInput::EXAMPLE]));
 
             return Command::INVALID;
         }
 
-        $io->success(\sprintf(
-            'Grid #%d saved: %s. It will be verified at every "grids check".',
-            $saved->id,
-            $saved->grid->format(),
-        ));
+        $io->newLine();
+        $io->writeln(\sprintf('  <fg=#2fbf71>✔</> %s   %s', $this->t('grids.saved', ['id' => $saved->id]), Ui::grid($saved->grid)));
+        if ($saved->grid->isMultiple($this->game)) {
+            $io->writeln('  <fg=gray>'.$this->t('grids.multiple', ['count' => $saved->grid->combinations($this->game)]).'</>');
+        }
+        $io->writeln('  <fg=gray>'.$this->t('grids.saved_hint').'</>');
+        $io->newLine();
 
         return Command::SUCCESS;
     }
@@ -119,18 +125,18 @@ HELP);
     private function removeGrid(SymfonyStyle $io, ?string $value): int
     {
         if (null === $value || !ctype_digit(trim($value))) {
-            $io->error('Provide the id of the grid to delete: app:euromillions:grids remove 2');
+            $io->error($this->t('grids.remove_usage', ['command' => 'app:euromillions:grids remove 2']));
 
             return Command::INVALID;
         }
 
         if (!$this->store->remove((int) trim($value))) {
-            $io->error(\sprintf('No grid with id %s.', trim($value)));
+            $io->error($this->t('grids.missing', ['id' => trim($value)]));
 
             return Command::FAILURE;
         }
 
-        $io->success('Grid deleted.');
+        $io->writeln('  <fg=#2fbf71>✔</> '.$this->t('grids.deleted', ['id' => (int) trim($value)]));
 
         return Command::SUCCESS;
     }
@@ -139,7 +145,7 @@ HELP);
     {
         $grids = $this->store->all();
         if ([] === $grids) {
-            $io->info('No grids to check. Add one: app:euromillions:grids add "1 9 23 34 48 + 3 7"');
+            $io->info($this->t('grids.none_to_check', ['command' => 'app:euromillions:grids add "1 9 23 34 48 + 3 7"']));
 
             return Command::SUCCESS;
         }
@@ -153,60 +159,58 @@ HELP);
         }
 
         if ([] === $draws) {
-            $io->error('No draw history available.');
+            $io->error($this->t('grids.no_history'));
 
             return Command::FAILURE;
         }
 
         $latest = $draws[array_key_last($draws)];
-        $io->title('Checking my grids');
-        $io->text(\sprintf(
-            'Latest known draw: <info>%s</info> — %s',
-            $latest->date->format('d/m/Y'),
-            $latest->grid->format(),
-        ));
+        Ui::banner($io, $this->t('grids.check_title'), $this->t('grids.check_subtitle'));
+        $io->writeln(\sprintf('  <fg=gray>%s</>   %s', $this->t('grids.latest', ['date' => Format::date($latest->date)]), Ui::grid($latest->grid)));
         $io->newLine();
 
         $anyWin = false;
         foreach ($this->store->findWins($draws, $this->prizeTable) as $entry) {
             $saved = $entry['grid'];
-            $label = \sprintf('Grid #%d (%s)', $saved->id, $saved->grid->format());
+            $io->writeln(\sprintf('  <options=bold>#%d</>  %s', $saved->id, Ui::grid($saved->grid, $latest->grid)));
 
             if ([] === $entry['results']) {
-                $io->text(\sprintf('%s: nothing noteworthy since the last check.', $label));
+                $io->writeln('       <fg=gray>'.$this->t('grids.nothing').'</>');
+                $io->newLine();
                 continue;
             }
 
-            $io->section($label);
-            $rows = [];
             foreach ($entry['results'] as $result) {
                 if (null !== $result['rank']) {
                     $anyWin = true;
                 }
-                $rows[] = [
+                $io->writeln(\sprintf(
+                    '       <fg=gray>%s</>  %d + %d★  %s',
                     $result['date'],
-                    \sprintf('%d number(s) + %d star(s)', $result['matchedMain'], $result['matchedBonus']),
+                    $result['matchedMain'],
+                    $result['matchedBonus'],
                     null !== $result['rank']
-                        ? \sprintf('<info>WON — tier %d (≈ %s)</info>', $result['rank'], Format::money($this->prizeTable->prizeFor($result['rank'])))
-                        : 'lost',
-                ];
+                        ? '<fg=black;bg=#2fbf71;options=bold> '.$this->t('grids.won', ['rank' => $result['rank'], 'amount' => Format::money($result['amount'])]).' </>'
+                            .(array_sum($result['wins']) > 1 ? ' <fg=gray>'.$this->t('grids.won_count', ['count' => array_sum($result['wins'])]).'</>' : '')
+                        : '<fg=gray>'.$this->t('grids.no_prize').'</>',
+                ));
             }
-            $io->table(['Draw', 'Matches', 'Result'], $rows);
+            $io->newLine();
         }
 
-        $this->store->markChecked();
+        $this->store->markChecked($latest);
 
+        $io->writeln($anyWin
+            ? '  <fg=#2fbf71;options=bold>🎉 '.$this->t('grids.any_win').'</>'
+            : '  <fg=gray>'.$this->t('grids.no_win').'</>');
         $io->newLine();
-        $io->text($anyWin
-            ? '<info>At least one win detected: verify the exact amount on your lottery\'s official website.</info>'
-            : 'No winnings over the checked period.');
 
         return Command::SUCCESS;
     }
 
     private function unknownAction(SymfonyStyle $io, string $action): int
     {
-        $io->error(\sprintf('Unknown action "%s". Actions: list, add, remove, check.', $action));
+        $io->error($this->t('grids.unknown_action', ['action' => $action]));
 
         return Command::INVALID;
     }

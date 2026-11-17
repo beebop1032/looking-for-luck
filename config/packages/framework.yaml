@@ -1,7 +1,7 @@
 # see https://symfony.com/doc/current/reference/configuration/framework.html
 framework:
     secret: '%env(APP_SECRET)%'
-    #csrf_protection: true
+    csrf_protection: true
     http_method_override: false
 
     # Enables session support. Note that the session will ONLY be started if you read or write from it.
@@ -17,8 +17,18 @@ framework:
     php_errors:
         log: true
 
+    # A rejected CSRF token or an unknown lottery is the client's problem, not a server error.
+    exceptions:
+        Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException:
+            log_level: notice
+        Symfony\Component\HttpKernel\Exception\NotFoundHttpException:
+            log_level: notice
+
 when@test:
     framework:
         test: true
+        # Tests never reach the network: every HTTP request answers 404.
+        http_client:
+            mock_response_factory: test.http_client.not_found
         session:
             storage_factory_id: session.storage.factory.mock_file

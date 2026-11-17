@@ -63,5 +63,14 @@ jobs:
       - name: Build image
         run: docker build -t looking-for-luck .
 
-      - name: Smoke test
+      - name: Smoke test (CLI)
         run: docker run --rm looking-for-luck app:euromillions:predict 3 --offline
+
+      - name: Smoke test (web)
+        run: |
+          docker run -d --name lfl -p 8080:8080 looking-for-luck
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/health && break; sleep 1; done
+          curl -fsS -o /dev/null "http://127.0.0.1:8080/euromillions/generate?filter=0"
+          curl -fsS -o /dev/null http://127.0.0.1:8080/
+          docker exec lfl supercronic -test /app/docker/crontab
+          docker rm -f lfl

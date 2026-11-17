@@ -6,7 +6,9 @@ namespace App\Command;
 
 use App\Euromillions\DrawRepository;
 use App\Euromillions\EuromillionsGame;
+use App\Intl\Format;
 use App\Lottery\Draw;
+use App\Lottery\Lottery;
 use App\Lottery\Statistics;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -21,6 +23,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class EuromillionsStatsCommand extends Command
 {
+    use TranslatesOutput;
+
     public function __construct(
         private readonly DrawRepository $repository,
         private readonly EuromillionsGame $game,
@@ -52,53 +56,60 @@ final class EuromillionsStatsCommand extends Command
         }
 
         if (\count($draws) < 50) {
-            $io->error(\sprintf('History too short (%d draws) for reliable statistics.', \count($draws)));
+            $io->error($this->t('stats.too_short', ['count' => \count($draws)]));
 
             return Command::FAILURE;
         }
 
-        $first = $draws[0]->date->format('d/m/Y');
-        $last = $draws[array_key_last($draws)]->date->format('d/m/Y');
+        $first = Format::date($draws[0]->date, 'd MMM y');
+        $last = Format::date($draws[array_key_last($draws)]->date, 'd MMM y');
 
-        $io->title(\sprintf('EuroMillions statistics — %d draws from %s to %s', \count($draws), $first, $last));
+        Ui::banner($output, $this->t('stats.title'), $this->t('stats.range', ['count' => Format::integer(\count($draws)), 'from' => $first, 'to' => $last]));
 
+        $latest = $draws[array_key_last($draws)];
+        $io->writeln(\sprintf('  <fg=gray>%s</>   %s', $this->t('stats.latest', ['date' => $last]), Ui::grid($latest->grid)));
+        $io->newLine();
+
+        // Star frequencies are only comparable under the current rules
+        // (12 stars since 2016): older draws could not hold stars 11 and 12.
         $mainFreq = $this->statistics->mainFrequencies($draws);
-        $bonusFreq = $this->statistics->bonusFrequencies($draws);
+        $bonusFreq = $this->statistics->bonusFrequencies(Lottery::underCurrentRules($this->game, $draws));
         $mainGaps = $this->statistics->mainGaps($draws);
         $bonusGaps = $this->statistics->bonusGaps($draws);
 
-        $this->renderRanking($io, 'Most drawn numbers', $mainFreq, $top, true);
-        $this->renderRanking($io, 'Least drawn numbers', $mainFreq, $top, false);
-        $this->renderRanking($io, 'Most drawn stars', $bonusFreq, min($top, 6), true);
-        $this->renderRanking($io, 'Least drawn stars', $bonusFreq, min($top, 6), false);
-        $io->text('<comment>Note:</comment> stars 10-12 only exist since 2011/2016 — their raw frequencies are mechanically lower.');
+        $this->renderHeatmap($io, $mainFreq, $bonusFreq);
+
+        $this->renderRanking($io, $this->t('stats.most_numbers'), $mainFreq, $top, true, false);
+        $this->renderRanking($io, $this->t('stats.least_numbers'), $mainFreq, $top, false, false);
+        $this->renderRanking($io, $this->t('stats.most_stars'), $bonusFreq, min($top, 6), true, true);
+        $this->renderRanking($io, $this->t('stats.least_stars'), $bonusFreq, min($top, 6), false, true);
+        $io->writeln('  <fg=gray>'.$this->t('stats.stars_note').'</>');
 
         // A given number comes out on average once every pool/picked draws.
         $mainAverageGap = intdiv($this->game->mainPool(), $this->game->mainPicked());
         $bonusAverageGap = intdiv($this->game->bonusPool(), $this->game->bonusPicked());
 
-        $io->section('"Overdue" numbers (gap = draws since last appearance)');
+        $io->section($this->t('stats.overdue_numbers'));
         arsort($mainGaps);
-        $rows = [];
-        foreach (\array_slice($mainGaps, 0, $top, true) as $number => $gap) {
-            $rows[] = [$number, $gap, \sprintf('%.1f× the average gap (%d)', $gap / $mainAverageGap, $mainAverageGap)];
-        }
-        $io->table(['Number', 'Current gap', 'Reading'], $rows);
+        $this->renderGaps($io, \array_slice($mainGaps, 0, $top, true), $mainAverageGap, false);
 
-        $io->section('"Overdue" stars');
+        $io->section($this->t('stats.overdue_stars'));
         arsort($bonusGaps);
-        $rows = [];
-        foreach (\array_slice($bonusGaps, 0, 5, true) as $star => $gap) {
-            $rows[] = [$star, $gap, \sprintf('%.1f× the average gap (%d)', $gap / $bonusAverageGap, $bonusAverageGap)];
-        }
-        $io->table(['Star', 'Current gap', 'Reading'], $rows);
+        $this->renderGaps($io, \array_slice($bonusGaps, 0, 5, true), $bonusAverageGap, true);
 
-        $io->section('Most frequent pairs of numbers');
-        $rows = [];
-        foreach ($this->statistics->topPairs($draws, $top) as $entry) {
-            $rows[] = [\sprintf('%d & %d', $entry['pair'][0], $entry['pair'][1]), $entry['count']];
+        $io->section($this->t('stats.pairs'));
+        $pairs = $this->statistics->topPairs($draws, $top);
+        $maxPair = [] === $pairs ? 1 : $pairs[0]['count'];
+        foreach ($pairs as $entry) {
+            $io->writeln(\sprintf(
+                '  %s %s  %s <options=bold>%d</>',
+                Ui::ball($entry['pair'][0]),
+                Ui::ball($entry['pair'][1]),
+                Ui::bar($entry['count'] / $maxPair, 24),
+                $entry['count'],
+            ));
         }
-        $io->table(['Pair', 'Drawn together'], $rows);
+        $io->newLine();
 
         $this->renderChiSquare($io, $draws);
 
@@ -106,22 +117,85 @@ final class EuromillionsStatsCommand extends Command
     }
 
     /**
-     * @param array<int,int> $frequencies
+     * @param non-empty-array<int,int> $mainFreq
+     * @param non-empty-array<int,int> $bonusFreq
      */
-    private function renderRanking(SymfonyStyle $io, string $title, array $frequencies, int $limit, bool $descending): void
+    private function renderHeatmap(SymfonyStyle $io, array $mainFreq, array $bonusFreq): void
+    {
+        $io->section($this->t('stats.heatmap'));
+
+        $this->renderHeatRows($io, $mainFreq, 10, false);
+        $io->newLine();
+        $this->renderHeatRows($io, $bonusFreq, 12, true);
+        $io->newLine();
+        $io->writeln(\sprintf(
+            '  <bg=%s>   </> %s   <bg=%s>   </> %s   <bg=%s>   </> %s   <fg=gray>%s</>',
+            Ui::heat(-1),
+            $this->t('stats.colder'),
+            Ui::heat(0),
+            $this->t('stats.average'),
+            Ui::heat(1),
+            $this->t('stats.hotter'),
+            $this->t('stats.heat_note'),
+        ));
+    }
+
+    /**
+     * @param non-empty-array<int,int> $frequencies
+     * @param positive-int $perRow
+     */
+    private function renderHeatRows(SymfonyStyle $io, array $frequencies, int $perRow, bool $stars): void
+    {
+        $mean = array_sum($frequencies) / \count($frequencies);
+        $spread = max(1.0, max(array_map(static fn (int $f): float => abs($f - $mean), $frequencies)));
+
+        foreach (array_chunk($frequencies, $perRow, true) as $row) {
+            $cells = [];
+            foreach ($row as $number => $count) {
+                $cells[] = \sprintf('<fg=white;bg=%s;options=bold> %s%02d </>', Ui::heat(($count - $mean) / $spread), $stars ? '★' : '', $number);
+            }
+            $io->writeln('  '.implode(' ', $cells));
+        }
+    }
+
+    /**
+     * @param non-empty-array<int,int> $frequencies
+     */
+    private function renderRanking(SymfonyStyle $io, string $title, array $frequencies, int $limit, bool $descending, bool $stars): void
     {
         $io->section($title);
 
         $sorted = $frequencies;
         $descending ? arsort($sorted) : asort($sorted);
         $total = array_sum($frequencies);
+        $max = max($frequencies);
 
-        $rows = [];
         foreach (\array_slice($sorted, 0, $limit, true) as $value => $count) {
-            $rows[] = [$value, $count, \sprintf('%.2f %%', 100 * $count / $total)];
+            $io->writeln(\sprintf(
+                '  %s  %s <options=bold>%4d</> <fg=gray>%s %%</>',
+                $stars ? Ui::star($value) : Ui::ball($value),
+                Ui::bar($count / $max, 30, $stars ? '#ffc83d' : '#2fbf71'),
+                $count,
+                Format::decimal(100 * $count / $total, 2),
+            ));
         }
+    }
 
-        $io->table(['Value', 'Draws', 'Share'], $rows);
+    /**
+     * @param array<int,int> $gaps
+     */
+    private function renderGaps(SymfonyStyle $io, array $gaps, int $averageGap, bool $stars): void
+    {
+        $max = max(1, ...array_values($gaps));
+        foreach ($gaps as $value => $gap) {
+            $io->writeln(\sprintf(
+                '  %s  %s <options=bold>%3d</> <fg=gray>%s</>',
+                $stars ? Ui::star($value) : Ui::ball($value),
+                Ui::bar($gap / $max, 24, '#7aa2f7'),
+                $gap,
+                $this->t('stats.gap_detail', ['ratio' => Format::decimal($gap / $averageGap, 1), 'average' => $averageGap]),
+            ));
+        }
     }
 
     /**
@@ -129,35 +203,30 @@ final class EuromillionsStatsCommand extends Command
      */
     private function renderChiSquare(SymfonyStyle $io, array $draws): void
     {
-        $io->section('Chi-squared test: is the draw compatible with pure randomness?');
+        $io->section($this->t('stats.chi_title'));
 
         // For the stars, restrict the test to draws held under constant rules
         // (12 stars since 2016-09-24), otherwise the test would merely detect
         // the rule change.
-        $starDraws = $this->game->drawsUnderCurrentStarRules($draws);
+        $starDraws = Lottery::underCurrentRules($this->game, $draws);
 
         $mainTest = $this->statistics->uniformityTest($this->statistics->mainFrequencies($draws));
         $starTest = $this->statistics->uniformityTest($this->statistics->bonusFrequencies($starDraws));
 
+        $verdict = fn (bool $compatible): string => $compatible
+            ? '<fg=#2fbf71>✔ '.$this->t('stats.compatible').'</>'
+            : '<fg=#ffc83d>⚠ '.$this->t('stats.unusual').'</>';
+
         $io->table(
-            ['', 'χ² statistic', 'Degrees of freedom', 'p-value', 'Verdict'],
+            ['', $this->t('stats.col_statistic'), $this->t('stats.col_dof'), $this->t('stats.col_pvalue'), $this->t('stats.col_verdict')],
             [
-                [\sprintf('Numbers (1-50, %d draws)', \count($draws)), \sprintf('%.2f', $mainTest['statistic']), $mainTest['degreesOfFreedom'], \sprintf('%.4f', $mainTest['pValue']), $mainTest['compatible'] ? 'Compatible with randomness' : 'Unusual deviation'],
-                [\sprintf('Stars (1-12, %d draws since 09/2016)', \count($starDraws)), \sprintf('%.2f', $starTest['statistic']), $starTest['degreesOfFreedom'], \sprintf('%.4f', $starTest['pValue']), $starTest['compatible'] ? 'Compatible with randomness' : 'Unusual deviation'],
+                [$this->t('stats.row_numbers', ['count' => \count($draws)]), Format::decimal($mainTest['statistic'], 2), $mainTest['degreesOfFreedom'], Format::decimal($mainTest['pValue'], 4), $verdict($mainTest['compatible'])],
+                [$this->t('stats.row_stars', ['count' => \count($starDraws)]), Format::decimal($starTest['statistic'], 2), $starTest['degreesOfFreedom'], Format::decimal($starTest['pValue'], 4), $verdict($starTest['compatible'])],
             ]
         );
 
-        $io->text([
-            '<comment>In plain language:</comment> this test compares the observed frequencies to what',
-            'a perfectly random draw would produce. The p-value is the probability of',
-            'observing deviations at least this large if randomness is pure.',
-            '',
-            ' · p-value ≥ 0.05: the gaps between "hot" and "cold" numbers are exactly',
-            '   what randomness produces. No number is favoured; past frequencies say',
-            '   nothing about future draws.',
-            ' · p-value < 0.05: the observed distribution would be unusual for a fair',
-            '   draw (still possible: 5% of perfectly random histories fall below this',
-            '   threshold out of sheer bad luck).',
-        ]);
+        Ui::note($io, $this->t('stats.chi_explain'));
+        Ui::note($io, $this->t('stats.chi_high'));
+        Ui::note($io, $this->t('stats.chi_low'));
     }
 }

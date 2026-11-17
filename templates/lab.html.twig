@@ -1,0 +1,106 @@
+{% extends '_lottery.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% block title %}{{ 'nav.lab'|trans }} – {{ lottery.name }}{% endblock %}
+{% block stage_title %}{{ 'lab.title'|trans }}{% endblock %}
+{% block stage_lead %}{{ 'lab.intro'|trans }}{% endblock %}
+{% block content %}
+{% set picks = {main: lottery.game.mainPicked, bonus: lottery.game.bonusPicked, label: bonus_label(lottery, lottery.game.bonusPicked)} %}
+<section class="block block--wide">
+    <form class="controls">
+        <label>{{ 'lab.strategy'|trans }}
+            <select name="strategy">{% for key in strategies %}<option value="{{ key }}" {{ key == params.strategy ? 'selected' }}>{{ ('lab.strategies.' ~ key)|trans }}</option>{% endfor %}</select>
+        </label>
+        <label>{{ 'lab.players'|trans }}
+            <select name="players" class="w-md">{% for n in [1000, 10000, 50000] %}<option value="{{ n }}" {{ n == params.players ? 'selected' }}>{{ n|integer }}</option>{% endfor %}</select>
+        </label>
+        <label>{{ 'lab.price'|trans }} <input type="number" name="price" step="0.05" min="0.5" max="50" value="{{ params.price }}" class="w-sm"></label>
+        <button class="btn"><svg class="icon"><use href="#i-lab"/></svg> {{ 'lab.run'|trans }}</button>
+    </form>
+</section>
+
+{% if result %}
+<section class="block">
+    <div class="block__head">
+        <h2>{{ ('lab.strategies.' ~ params.strategy)|trans }}</h2>
+        <p>{{ ('lab.desc_' ~ params.strategy)|trans(picks) }}</p>
+        {% if params.strategy != 'random' %}
+            <p style="margin-top: 16px; color: var(--ink); font-weight: 600">{{ 'lab.next_pick'|trans }}</p>
+            <div style="margin-top: 8px">{{ ui.balls(result.nextGrid, lottery.definition.bonusShape, null, 'sm') }}</div>
+        {% endif %}
+    </div>
+    <div>
+        <dl class="figures">
+            <div class="figure"><dt>{{ 'lab.staked'|trans }}</dt><dd>{{ result.cost|money(0) }}<small>{{ 'lab.played_draws'|trans({count: result.playedDraws|integer}) }}</small></dd></div>
+            <div class="figure"><dt>{{ 'lab.won'|trans }}</dt><dd>{{ result.winnings|money(0) }}</dd></div>
+            <div class="figure"><dt>{{ 'common.net'|trans }}</dt><dd>{{ ui.money(result.net, 0) }}</dd></div>
+        </dl>
+        {% if result.winsByRank is not empty %}
+            <p style="margin-top: 18px; display: flex; gap: 6px; flex-wrap: wrap">{% for rank, n in result.winsByRank %}<span class="tag {{ rank <= 6 ? 'tag--gold' }}">{{ 'common.tier_times'|trans({rank: rank, count: n}) }}</span>{% endfor %}</p>
+        {% endif %}
+        <p class="small muted" style="margin-top: 12px">{{ 'lab.period'|trans({from: result.from|format_date('long'), to: result.to|format_date('long')}) }}</p>
+    </div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'lab.against'|trans({count: params.players|integer}) }}</h2>
+        <p>{{ 'lab.beats'|trans({median: (-result.cohort.median)|money(0), low: (-result.cohort.p95)|money(0), high: (-result.cohort.p5)|money(0)}) }}</p>
+    </div>
+    <div>
+        <p class="gauge-result">{{ 'lab.percentile'|trans({value: result.percentile|num(0)}) }}</p>
+        <div class="gauge">
+            <span class="gauge__dot" style="left: {{ result.percentile }}%"></span>
+        </div>
+        <div class="gauge-scale"><span>{{ 'lab.worse'|trans }}</span><span>{{ 'lab.better'|trans }}</span></div>
+        <p style="margin-top: 22px; max-width: 64ch">{{ 'lab.ordinary'|trans({percent: (100 - result.percentile)|num(0)}) }}</p>
+        {% if params.strategy == 'random' %}
+            <div class="callout" style="margin-top: 18px; max-width: 64ch">{{ 'lab.random_note'|trans }}</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="block block--wide">
+    <div class="block__head">
+        <h2>{{ 'lab.plays_title'|trans }}</h2>
+        <p>{{ 'lab.distinct'|trans({distinct: result.distinctGrids|integer, count: result.playedDraws|integer}) }}</p>
+        <p class="presets" style="margin-top: 14px">
+            {% set q = {lottery: lottery.slug, strategy: params.strategy, players: params.players, price: params.price} %}
+            <a class="tag{{ not showWins ? ' tag--active' }}" href="{{ path('lab', q) }}">{{ 'lab.plays_recent'|trans }}</a>
+            <a class="tag{{ showWins ? ' tag--active' }}" href="{{ path('lab', q|merge({plays: 'wins'})) }}">{{ 'lab.plays_wins'|trans }}</a>
+        </p>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>{{ 'draws.col_date'|trans }}</th><th>{{ 'lab.col_played'|trans }}</th><th>{{ 'lab.col_drawn'|trans }}</th><th class="num">{{ 'grids.col_prize'|trans }}</th></tr></thead>
+            <tbody>
+            {% for p in plays %}
+                <tr class="{{ p.rank ? 'win' }}">
+                    <td class="nowrap">{{ p.date|format_date(pattern: 'EEE d MMM y') }}</td>
+                    <td>{{ ui.balls(p.played, lottery.definition.bonusShape, p.drawn, 'sm') }}</td>
+                    <td>{{ ui.balls(p.drawn, lottery.definition.bonusShape, null, 'sm') }}</td>
+                    <td class="num nowrap">{% if p.rank %}<span class="tag tag--win">{{ 'common.tier'|trans({rank: p.rank}) }}</span>{% else %}<span class="muted">{{ 'common.matches'|trans({main: p.matchedMain, bonus: p.matchedBonus}) }}</span>{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4" class="muted">{{ 'lab.no_wins'|trans }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'lab.how_title'|trans }}</h2>
+    </div>
+    <div style="max-width: 66ch">
+        <p class="lede">{{ 'lab.how_story'|trans({year: result ? result.from|date('Y') : (rulesSince ? rulesSince|date('Y') : '')}) }}</p>
+        <ol class="steps" style="margin-top: 20px">
+            <li>{{ 'lab.how_learn'|trans({year: firstYear}) }}</li>
+            <li>{{ rulesSince ? 'lab.how_count_rules'|trans({date: rulesSince|format_date('long')}) : 'lab.how_count'|trans }}</li>
+            <li>{{ 'lab.how_players'|trans({count: params.players|integer}) }}</li>
+        </ol>
+        <div class="callout" style="margin-top: 22px"><strong>{{ 'lab.honest_title'|trans }}</strong> {{ 'lab.honest'|trans }}</div>
+    </div>
+</section>
+{% endblock %}

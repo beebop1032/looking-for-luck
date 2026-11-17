@@ -1,0 +1,7 @@
+# Anti-sharing filter reasons (ids are the English messages of PopularityFilter).
+"all numbers are multiples of the same value": "todos los números son múltiplos del mismo valor"
+"all numbers ≤ 31 (\"birthday\" grids, heavily played)": "todos los números ≤ 31 (combinaciones de cumpleaños, muy jugadas)"
+"arithmetic sequence (e.g. 5-10-15-20-25), a very popular pattern": "progresión aritmética (p. ej. 5-10-15-20-25), un patrón muy jugado"
+"combination already drawn in a past draw (often replayed)": "combinación ya premiada en un sorteo anterior (se vuelve a jugar a menudo)"
+"four or more consecutive numbers": "cuatro o más números consecutivos"
+"visual pattern on the paper slip (column, row or diagonal)": "dibujo en el boleto (columna, fila o diagonal)"

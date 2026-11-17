@@ -1,0 +1,78 @@
+{% extends '_lottery.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% set shape = lottery.definition.bonusShape %}
+{% block title %}{{ 'nav.grids'|trans }} – {{ lottery.name }}{% endblock %}
+{% block stage_title %}{{ 'nav.grids'|trans }}{% endblock %}
+{% block stage_lead %}{{ 'grids.intro'|trans({days: draw_days(lottery)}) }}{% endblock %}
+{% block stage_extra %}
+    <form class="controls" method="post" action="{{ path('grids_add', {lottery: lottery.slug}) }}" style="margin-top: 26px">
+        <input type="hidden" name="_token" value="{{ csrf_token('grids') }}">
+        <label style="color: var(--stage-muted)">{{ 'grids.input_label'|trans({main: lottery.game.mainPicked, bonus: lottery.game.bonusPicked, label: bonus_label(lottery, lottery.game.bonusPicked)}) }}
+            <input class="input-grid" name="grid" required placeholder="{{ lottery.gridInput.example }}" pattern="{{ lottery.gridInput.htmlPattern(true) }}" autocomplete="off" style="border-color: transparent; width: min(340px, 100%)">
+        </label>
+        <button class="btn btn--gold"><svg class="icon"><use href="#i-plus"/></svg> {{ 'grids.save'|trans }}</button>
+    </form>
+    <p class="small" style="color: var(--stage-muted); margin-top: 10px">{{ 'grids.multiple_hint'|trans({mainMax: lottery.gridInput.maxMain, bonusMax: lottery.gridInput.maxBonus, label: bonus_label(lottery)}) }}</p>
+{% endblock %}
+{% block content %}
+{% for g in grids %}
+    <section class="block block--wide">
+        <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+            <span class="list__index">{{ g.saved.id }}</span>
+            {{ ui.balls(g.saved.grid, shape, null, 'lg') }}
+            {% if g.multiple %}<span class="tag tag--gold">{{ 'grids.multiple_tag'|trans({count: g.combinations|integer, price: g.pricePerDraw|money}) }}</span>{% endif %}
+            <span class="grow"></span>
+            {% if not g.multiple %}<a class="btn btn--ghost btn--sm" href="{{ path('draws', {lottery: lottery.slug, grid: g.saved.grid.main|join(' ') ~ ' + ' ~ g.saved.grid.bonus|join(' ')}) }}">{{ 'grids.replay'|trans }}</a>{% endif %}
+            <form method="post" action="{{ path('grids_delete', {lottery: lottery.slug, id: g.saved.id}) }}" data-confirm="{{ 'grids.delete_confirm'|trans({id: g.saved.id}) }}" onsubmit="return confirm(this.dataset.confirm)">
+                <input type="hidden" name="_token" value="{{ csrf_token('grids') }}">
+                <button class="btn btn--danger btn--sm">{{ 'grids.delete'|trans }}</button>
+            </form>
+        </div>
+        <dl class="figures" style="margin: 22px 0 18px">
+            <div class="figure"><dt>{{ 'grids.saved_on'|trans }}</dt><dd>{{ g.saved.createdAt|format_date('medium') }}</dd></div>
+            <div class="figure"><dt>{{ 'grids.draws_since'|trans }}</dt><dd>{{ g.played }}</dd></div>
+            <div class="figure"><dt>{{ 'grids.wins'|trans }}</dt><dd>{{ g.wins }}</dd></div>
+            <div class="figure"><dt>{{ 'grids.balance'|trans }}</dt><dd>{{ ui.money(g.winnings - g.cost) }}</dd></div>
+        </dl>
+        {% if g.history is empty %}
+            <p class="small muted">{{ 'grids.no_draw_yet'|trans({date: lottery.nextDraw|format_datetime(pattern: 'EEEE d MMMM, HH:mm', timezone: lottery.game.drawTimezone)}) }}</p>
+        {% else %}
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>{{ 'grids.col_draw'|trans }}</th><th>{{ 'grids.col_result'|trans }}</th><th>{{ 'draws.col_matches'|trans }}</th><th class="num">{{ 'grids.col_prize'|trans }}</th></tr></thead>
+                    <tbody>
+                    {% for h in g.history %}
+                        <tr class="{{ h.rank ? 'win' }}">
+                            <td class="nowrap">{{ h.draw.date|format_date(pattern: 'EEE d MMM y') }}</td>
+                            <td>{{ ui.balls(h.draw.grid, shape, g.saved.grid, 'sm') }}</td>
+                            <td class="nowrap">{{ 'common.matches'|trans({main: h.matchedMain, bonus: h.matchedBonus}) }}</td>
+                            <td class="num">
+                                {% if h.rank %}
+                                    {% for rank, n in h.wins %}<span class="tag tag--win">{{ n > 1 ? 'common.tier_times'|trans({rank: rank, count: n}) : 'common.tier'|trans({rank: rank}) }}</span> {% endfor %}
+                                    {% if g.multiple %}<br><span class="small">≈ {{ h.amount|money(0) }}</span>{% endif %}
+                                {% else %}<span class="muted">–</span>{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if g.played > g.history|length %}<p class="small muted" style="margin-top: 10px">{{ 'grids.showing'|trans({count: g.history|length}) }}</p>{% endif %}
+        {% endif %}
+    </section>
+{% else %}
+    <section class="block block--wide empty">
+        <p>{{ 'grids.empty'|trans }}</p>
+        <a class="btn" href="{{ path('generate', {lottery: lottery.slug}) }}"><svg class="icon"><use href="#i-generate"/></svg> {{ 'generate.title'|trans }}</a>
+    </section>
+{% endfor %}
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'grids.storage_title'|trans }}</h2>
+    </div>
+    <div style="max-width: 66ch">
+        <p>{{ 'grids.storage'|trans }}</p>
+        <p class="small muted" style="margin-top: 12px">{{ 'grids.disclaimer'|trans }}</p>
+    </div>
+</section>
+{% endblock %}

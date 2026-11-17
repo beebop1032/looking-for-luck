@@ -25,6 +25,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class EuromillionsAskCommand extends Command
 {
+    use TranslatesOutput;
+
     private const DEFAULT_MODEL = 'claude-opus-5-5';
 
     private const SYSTEM_PROMPT = <<<'PROMPT'
@@ -75,12 +77,12 @@ HELP);
         $apiKey = $this->resolveApiKey();
         if (null === $apiKey) {
             $io->info([
-                'The AI assistant is optional and currently disabled.',
-                'To enable it, add your Anthropic API key to .env.local (git-ignored):',
+                $this->t('ask.disabled'),
+                $this->t('ask.enable'),
                 '',
                 '  ANTHROPIC_API_KEY=sk-ant-...',
                 '',
-                'Get a key at https://console.anthropic.com/ — everything else in the toolkit works without it.',
+                $this->t('ask.get_key', ['url' => 'https://console.anthropic.com/']),
             ]);
 
             return Command::INVALID;
@@ -101,8 +103,10 @@ HELP);
         $interactive = !\is_string($question) || '' === trim($question);
 
         if ($interactive) {
-            $io->title('Chat about your EuroMillions data');
-            $io->text(\sprintf('Model: <info>%s</info> — type <comment>exit</comment> to quit.', $model));
+            $io->title($this->t('ask.title'));
+            Ui::warning($output);
+            $io->newLine();
+            $io->text($this->t('ask.model', ['model' => '<info>'.$model.'</info>', 'exit' => '<comment>exit</comment>']));
             $io->newLine();
         }
 
@@ -111,7 +115,7 @@ HELP);
 
         do {
             if ($interactive) {
-                $question = $io->ask('You');
+                $question = $io->ask($this->t('ask.you'));
                 if (!\is_string($question) || '' === trim($question) || 'exit' === strtolower(trim($question))) {
                     return Command::SUCCESS;
                 }
@@ -127,16 +131,16 @@ HELP);
                     messages: $messages,
                 );
             } catch (AuthenticationException) {
-                $io->error('The Anthropic API rejected your key. Check ANTHROPIC_API_KEY in .env.local.');
+                $io->error($this->t('ask.bad_key'));
 
                 return Command::FAILURE;
             } catch (APIStatusException $e) {
                 $type = $e->type;
-                $io->error(\sprintf('Anthropic API error (%s): %s', null !== $type ? $type->value : 'unknown', $e->getMessage()));
+                $io->error($this->t('ask.api_error', ['type' => null !== $type ? $type->value : '?', 'message' => $e->getMessage()]));
 
                 return Command::FAILURE;
             } catch (APIConnectionException) {
-                $io->error('Could not reach the Anthropic API. Check your network connection.');
+                $io->error($this->t('ask.unreachable'));
 
                 return Command::FAILURE;
             }
@@ -151,7 +155,7 @@ HELP);
             $messages[] = ['role' => 'assistant', 'content' => $answer];
 
             $io->newLine();
-            $io->text('<info>AI</info>');
+            $io->text('<info>'.$this->t('ask.ai').'</info>');
             $io->text(explode("\n", $answer));
             $io->newLine();
         } while ($interactive);

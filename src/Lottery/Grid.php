@@ -21,13 +21,36 @@ final class Grid
     }
 
     /**
-     * Raw values are normalized (cast to int, deduplicated, sorted) and
-     * validated against the game's matrix.
+     * A simple grid. Raw values are normalized (cast to int, deduplicated,
+     * sorted) and validated against the game's matrix.
      *
      * @param array<mixed> $main
      * @param array<mixed> $bonus
      */
     public static function of(LotteryGame $game, array $main, array $bonus): self
+    {
+        return self::validated($game, $main, $bonus, $game->mainPicked(), $game->bonusPicked());
+    }
+
+    /**
+     * A ticket that may tick more numbers than a simple grid (a "multiple"
+     * grid), e.g. 7 numbers and 3 stars. A simple grid is valid too.
+     *
+     * @param array<mixed> $main
+     * @param array<mixed> $bonus
+     */
+    public static function multiple(LotteryGame $game, array $main, array $bonus): self
+    {
+        return self::validated($game, $main, $bonus, $game->mainPool(), $game->bonusPool());
+    }
+
+    /**
+     * @param array<mixed> $main
+     * @param array<mixed> $bonus
+     * @param int $maxMain most main numbers allowed (at least mainPicked)
+     * @param int $maxBonus most bonus numbers allowed (at least bonusPicked)
+     */
+    private static function validated(LotteryGame $game, array $main, array $bonus, int $maxMain, int $maxBonus): self
     {
         $main = self::normalize($main);
         $bonus = self::normalize($bonus);
@@ -35,24 +58,44 @@ final class Grid
         if ([] === $main || [] === $bonus) {
             throw new \InvalidArgumentException('A grid cannot be empty.');
         }
-        if (\count($main) !== $game->mainPicked()) {
-            throw new \InvalidArgumentException(\sprintf('%s requires %d distinct main numbers, got %d.', $game->name(), $game->mainPicked(), \count($main)));
-        }
-        if (\count($bonus) !== $game->bonusPicked()) {
-            throw new \InvalidArgumentException(\sprintf('%s requires %d distinct bonus numbers, got %d.', $game->name(), $game->bonusPicked(), \count($bonus)));
-        }
-        foreach ($main as $n) {
-            if ($n < 1 || $n > $game->mainPool()) {
-                throw new \InvalidArgumentException(\sprintf('Main number out of range [1-%d]: %d.', $game->mainPool(), $n));
-            }
-        }
-        foreach ($bonus as $n) {
-            if ($n < 1 || $n > $game->bonusPool()) {
-                throw new \InvalidArgumentException(\sprintf('Bonus number out of range [1-%d]: %d.', $game->bonusPool(), $n));
-            }
-        }
+        self::checkCount($game, 'main', \count($main), $game->mainPicked(), $maxMain);
+        self::checkCount($game, 'bonus', \count($bonus), $game->bonusPicked(), $maxBonus);
+        self::checkRange('Main', $main, $game->mainPool());
+        self::checkRange('Bonus', $bonus, $game->bonusPool());
 
         return new self($main, $bonus);
+    }
+
+    private static function checkCount(LotteryGame $game, string $kind, int $count, int $min, int $max): void
+    {
+        if ($count < $min || $count > $max) {
+            throw new \InvalidArgumentException($min === $max ? \sprintf('%s requires %d distinct %s numbers, got %d.', $game->name(), $min, $kind, $count) : \sprintf('%s needs %d to %d distinct %s numbers, got %d.', $game->name(), $min, $max, $kind, $count));
+        }
+    }
+
+    /**
+     * @param list<int> $numbers
+     */
+    private static function checkRange(string $kind, array $numbers, int $pool): void
+    {
+        foreach ($numbers as $n) {
+            if ($n < 1 || $n > $pool) {
+                throw new \InvalidArgumentException(\sprintf('%s number out of range [1-%d]: %d.', $kind, $pool, $n));
+            }
+        }
+    }
+
+    /**
+     * How many simple grids this ticket contains (1 for a simple grid).
+     */
+    public function combinations(LotteryGame $game): int
+    {
+        return (int) round(PrizeTable::choose(\count($this->main), $game->mainPicked()) * PrizeTable::choose(\count($this->bonus), $game->bonusPicked()));
+    }
+
+    public function isMultiple(LotteryGame $game): bool
+    {
+        return \count($this->main) > $game->mainPicked() || \count($this->bonus) > $game->bonusPicked();
     }
 
     public function signature(): string

@@ -1,0 +1,57 @@
+{% extends 'base.html.twig' %}
+{# Every page of a lottery: masthead with the lottery switcher and tabs, a
+   stage (slim by default, the full draw board on the overview), then the page. #}
+{% block page %}
+<header class="masthead">
+    <div class="wrap">
+        <div class="masthead__bar">
+            <a class="brand" href="{{ path('hub') }}"><svg aria-hidden="true"><use href="#i-logo"/></svg><span>Looking for Luck</span></a>
+            <details class="switch">
+                <summary aria-label="{{ 'nav.lottery'|trans }}"><span aria-hidden="true">{{ lottery.definition.region }}</span> {{ lottery.name }} <svg class="icon"><use href="#i-chevron"/></svg></summary>
+                <div class="switch__menu">
+                    {% set route = app.request.attributes.get('_route') %}
+                    {% for other in lotteries() %}
+                        <a href="{{ path(route in ['grids_add', 'grids_delete', 'sync'] ? 'overview' : route, {lottery: other.slug}) }}" {% if other.slug == lottery.slug %}aria-current="true"{% endif %}><span aria-hidden="true">{{ other.definition.region }}</span> {{ other.name }}</a>
+                    {% endfor %}
+                    {% if planned_lotteries() is not empty %}
+                        <hr>
+                        {% for p in planned_lotteries() %}
+                            <div class="switch__soon"><span aria-hidden="true">{{ p.region }}</span> {{ p.name }} <a href="{{ repo_url }}/issues/{{ p.issue }}">{{ 'nav.help_add'|trans }}</a></div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </details>
+            <div class="masthead__tools">{% include '_tools.html.twig' %}</div>
+        </div>
+        {% set route = app.request.attributes.get('_route') %}
+        <nav class="tabs" aria-label="{{ lottery.name }}">
+            {% for name in ['overview', 'generate', 'draws', 'stats', 'grids', 'group', 'budget', 'lab'] %}
+                <a href="{{ path(name, {lottery: lottery.slug}) }}" {% if route == name or route starts with name ~ '_' %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-{{ name }}"/></svg>{{ ('nav.' ~ name)|trans }}</a>
+            {% endfor %}
+        </nav>
+    </div>
+</header>
+
+{% block stage %}
+<section class="stage stage--slim">
+    <div class="wrap stage__inner">
+        <h1>{% block stage_title %}{% endblock %}</h1>
+        {% set lead %}{% block stage_lead %}{% endblock %}{% endset %}
+        {% if lead|trim %}<p class="stage__lead">{{ lead }}</p>{% endif %}
+        {% block stage_extra %}{% endblock %}
+    </div>
+</section>
+{% endblock %}
+
+<main class="page wrap">
+    {% for type, messages in app.flashes %}
+        {% for message in messages %}
+            <div class="flash flash--{{ type }}" role="status">{{ message }}</div>
+        {% endfor %}
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+
+    {% include '_footer.html.twig' %}
+</main>
+{% endblock %}

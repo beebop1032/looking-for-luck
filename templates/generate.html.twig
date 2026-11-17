@@ -1,0 +1,67 @@
+{% extends '_lottery.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% set shape = lottery.definition.bonusShape %}
+{% block title %}{{ 'generate.title'|trans }} – {{ lottery.name }}{% endblock %}
+{% block stage_title %}{{ 'generate.title'|trans }}{% endblock %}
+{% block stage_lead %}{{ 'generate.intro'|trans }}{% endblock %}
+{% block content %}
+<section class="block block--wide">
+    <form class="controls">
+        <label>{{ 'common.grids'|trans }}
+            <select name="count" class="w-sm">{% for n in [1, 2, 3, 4, 5, 6, 8, 10, 15, 20] %}<option {{ n == count ? 'selected' }}>{{ n }}</option>{% endfor %}</select>
+        </label>
+        <label class="check"><input type="checkbox" name="filter" value="1" {{ filter ? 'checked' }} onchange="this.form.querySelector('[name=filter][type=hidden]').disabled = this.checked"> {{ 'generate.filter'|trans }} <span class="small muted">({{ 'generate.filter_hint'|trans }})</span></label>
+        <input type="hidden" name="filter" value="0" {{ filter ? 'disabled' }}>
+        <button class="btn"><svg class="icon"><use href="#i-refresh"/></svg> {{ 'generate.again'|trans }}</button>
+    </form>
+</section>
+
+<section class="block block--wide" style="padding-top: 0; border-top: 0">
+    <ul class="list">
+        {% for grid in grids %}
+            {% set text = grid.main|join(' ') ~ ' + ' ~ grid.bonus|join(' ') %}
+            <li>
+                <span class="list__index">{{ loop.index }}</span>
+                {{ ui.balls(grid, shape, null, 'lg', true) }}
+                <span class="grow"></span>
+                <button type="button" class="btn btn--ghost btn--sm" data-copy="{{ text }}" data-copied="{{ 'generate.copied'|trans }}"><svg class="icon"><use href="#i-copy"/></svg> <span data-label>{{ 'generate.copy'|trans }}</span></button>
+                <form method="post" action="{{ path('grids_add', {lottery: lottery.slug}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('grids') }}">
+                    <input type="hidden" name="grid" value="{{ text }}">
+                    <button class="btn btn--sm" title="{{ 'generate.save_title'|trans }}"><svg class="icon"><use href="#i-save"/></svg> {{ 'generate.save'|trans }}</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'generate.how_title'|trans }}</h2>
+    </div>
+    <div>
+        <p style="max-width: 66ch">{{ 'generate.how_text'|trans }}</p>
+        <div class="callout" style="margin-top: 18px; max-width: 66ch"><strong>{{ 'generate.odds_title'|trans }}</strong> {{ 'generate.odds_text'|trans({odds: lottery.jackpotOdds|integer}) }}</div>
+    </div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'generate.rejected_title'|trans }}</h2>
+        <p>{% if rejectedTotal == 0 %}{{ filter ? 'generate.rejected_none'|trans : 'generate.filter_off'|trans }}{% else %}{{ 'generate.rejected_text'|trans({count: rejectedTotal}) }}{% endif %}</p>
+    </div>
+    {% if rejectedGrids is not empty %}
+        <div>
+            <ul class="list rejected">
+                {% for r in rejectedGrids %}
+                    <li>
+                        {{ ui.balls(r.grid, shape, null, 'sm') }}
+                        <span class="rejected__reasons">{% for reason in r.reasons %}<span class="tag">{{ reason|trans({}, 'filter') }}</span>{% endfor %}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+            {% if rejectedTotal > rejectedGrids|length %}<p class="small muted" style="margin-top: 12px">{{ 'generate.rejected_more'|trans({count: rejectedTotal - rejectedGrids|length}) }}</p>{% endif %}
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

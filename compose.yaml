@@ -1,12 +1,20 @@
 services:
   app:
     build: .
-    # Persist the draw cache and saved grids between runs.
+    image: looking-for-luck
+    ports:
+      - "${LFL_PORT:-8090}:8080"
+    # Draw cache, saved grids and sync status survive restarts and rebuilds.
     volumes:
-      - lottery-data:/app/var
+      - lottery-data:/data
     environment:
       # Optional: enables the AI assistant (app:euromillions:ask).
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Optional: language of the command-line output (en, fr, nl, es, de).
+      - LFL_LOCALE=${LFL_LOCALE:-}
+      - LFL_COUNTRY=${LFL_COUNTRY:-}
+    init: true
+    restart: unless-stopped
 
 volumes:
   lottery-data:

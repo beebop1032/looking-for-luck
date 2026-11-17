@@ -19,7 +19,7 @@ final class PrizeTable
         private readonly LotteryGame $game,
         ?float $jackpot = null,
     ) {
-        $this->jackpot = max($game->minimumJackpot(), $jackpot ?? $game->defaultJackpot());
+        $this->jackpot = min($game->maximumJackpot(), max($game->minimumJackpot(), $jackpot ?? $game->defaultJackpot()));
     }
 
     public function withJackpot(float $jackpot): self
@@ -110,7 +110,50 @@ final class PrizeTable
         return $expected;
     }
 
-    private static function choose(int $n, int $k): float
+    /**
+     * Every prize won by a ticket of $mainChosen numbers and $bonusChosen
+     * bonus numbers (a simple or multiple grid) when $mainHits drawn numbers
+     * and $bonusHits drawn bonus numbers are among them: a multiple grid can
+     * win several tiers, several times, at the same draw.
+     *
+     * @return array<int, int> tier => how many of the ticket's simple grids win it, best tier first
+     */
+    public function ticketWins(int $mainChosen, int $bonusChosen, int $mainHits, int $bonusHits): array
+    {
+        $n = $this->game->mainPicked();
+        $b = $this->game->bonusPicked();
+
+        $wins = [];
+        foreach ($this->ranks() as $rank) {
+            $count = self::choose($mainHits, $rank['main']) * self::choose($mainChosen - $mainHits, $n - $rank['main'])
+                * self::choose($bonusHits, $rank['bonus']) * self::choose($bonusChosen - $bonusHits, $b - $rank['bonus']);
+            if ($count > 0) {
+                $wins[$rank['rank']] = (int) round($count);
+            }
+        }
+
+        return $wins;
+    }
+
+    /**
+     * What a ticket wins at one draw: every tier won, and the total (indicative) amount.
+     *
+     * @return array{wins: array<int, int>, best: ?int, amount: float}
+     */
+    public function ticketResult(Grid $ticket, Grid $draw): array
+    {
+        $matches = $ticket->matches($draw);
+        $wins = $this->ticketWins(\count($ticket->main), \count($ticket->bonus), $matches['main'], $matches['bonus']);
+
+        $amount = 0.0;
+        foreach ($wins as $rank => $count) {
+            $amount += $count * $this->prizeFor($rank);
+        }
+
+        return ['wins' => $wins, 'best' => [] === $wins ? null : min(array_keys($wins)), 'amount' => $amount];
+    }
+
+    public static function choose(int $n, int $k): float
     {
         if ($k < 0 || $k > $n) {
             return 0.0;

@@ -1,0 +1,156 @@
+{% extends 'base.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% block title %}{{ 'hub.title'|trans }}{% endblock %}
+{% block page %}
+{% set featured = lotteries|first %}
+<header class="masthead">
+    <div class="wrap masthead__bar">
+        <a class="brand" href="{{ path('hub') }}"><svg aria-hidden="true"><use href="#i-logo"/></svg><span>Looking for Luck</span></a>
+        <div class="masthead__tools">{% include '_tools.html.twig' %}</div>
+    </div>
+</header>
+
+<section class="stage">
+    <div class="wrap stage__inner hero">
+        <div>
+            <h1>{{ 'hub.headline'|trans }}</h1>
+            <p class="stage__lead">{{ 'hub.lead'|trans }}</p>
+            <div class="stage__actions">
+                {% if featured %}
+                    <a class="btn btn--gold" href="{{ path('generate', {lottery: featured.lottery.slug}) }}">{{ 'hub.cta_generate'|trans({lottery: featured.lottery.name}) }}</a>
+                {% endif %}
+                {% if featured %}
+                    <a class="btn btn--on-stage" href="{{ path('budget', {lottery: featured.lottery.slug}) }}"><svg class="icon"><use href="#i-budget"/></svg> {{ 'hub.cta_budget'|trans }}</a>
+                {% endif %}
+            </div>
+        </div>
+        {% if featured and featured.latest %}
+            {% set g = featured.latest.grid %}
+            <figure style="margin: 0">
+                <div class="hero-balls balls--drop" aria-label="{{ 'slip.label'|trans({numbers: g.main|join(', '), bonus: g.bonus|join(', ')}) }}" role="img">
+                    {% for n in g.main %}<span class="ball d{{ n // 10 }}" style="--i: {{ loop.index0 }}">{{ n }}</span>{% endfor %}
+                    {% for n in g.bonus %}{% if featured.lottery.definition.bonusShape == 'star' %}<span class="star" style="--i: {{ g.main|length + loop.index0 }}"><span>{{ n }}</span></span>{% else %}<span class="ball ball--bonus" style="--i: {{ g.main|length + loop.index0 }}">{{ n }}</span>{% endif %}{% endfor %}
+                </div>
+                <figcaption class="small" style="color: var(--stage-muted); margin-top: 18px; text-align: right">{{ 'hub.slip_caption'|trans({lottery: featured.lottery.name, date: featured.latest.date|format_date(pattern: 'EEEE d MMMM y')}) }}</figcaption>
+            </figure>
+        {% endif %}
+    </div>
+</section>
+
+<main class="page wrap">
+    {% for item in lotteries %}
+        {% set l = item.lottery %}
+        {% set shape = l.definition.bonusShape %}
+        <section class="showcase" style="--lottery-stage: {{ l.definition.accentColor }}">
+            <header class="showcase__head">
+                <div>
+                    <p class="showcase__eyebrow"><span aria-hidden="true">{{ l.definition.region }}</span> <span class="tag tag--live">{{ 'hub.live'|trans }}</span></p>
+                    <h2><a href="{{ path('overview', {lottery: l.slug}) }}">{{ l.name }}</a></h2>
+                </div>
+                <dl class="showcase__facts">
+                    {% if item.nextJackpot %}
+                        <div><dt>{{ 'overview.next_jackpot'|trans({date: item.nextJackpot.drawDate|format_date(pattern: 'EEEE d MMMM')}) }}</dt><dd>{{ item.nextJackpot.amount|money(0) }}</dd></div>
+                    {% endif %}
+                    <div><dt>{{ 'overview.next_in'|trans }}</dt><dd>{{ ui.countdown(l) }}</dd></div>
+                </dl>
+            </header>
+
+            {% if item.grid is defined %}
+            {# The three everyday uses first: play, follow, understand the cost. #}
+            <div class="features">
+                <a class="feature feature--wide" href="{{ path('generate', {lottery: l.slug}) }}">
+                    <span class="feature__title"><svg class="icon"><use href="#i-generate"/></svg> {{ 'nav.generate'|trans }}</span>
+                    {{ ui.balls(item.grid, shape, null, 'lg', true) }}
+                    <span class="feature__text">{{ 'hub.f_generate'|trans }}</span>
+                </a>
+                <a class="feature" href="{{ path('grids', {lottery: l.slug}) }}">
+                    <span class="feature__title"><svg class="icon"><use href="#i-grids"/></svg> {{ 'nav.grids'|trans }}</span>
+                    {% if item.savedGrids %}<span class="feature__figure">{{ item.savedGrids }}</span>{% endif %}
+                    <span class="feature__text">{{ item.savedGrids ? 'hub.f_grids_some'|trans({count: item.savedGrids}) : 'hub.f_grids_none'|trans }}</span>
+                </a>
+                <a class="feature feature--full feature--budget" href="{{ path('budget', {lottery: l.slug}) }}">
+                    <span class="feature__title"><svg class="icon"><use href="#i-budget"/></svg> {{ 'hub.f_budget_title'|trans }}</span>
+                    <dl class="figures">
+                        <div class="figure"><dt>{{ 'budget.staked'|trans }}</dt><dd>{{ item.budget.cost|money(0) }}</dd></div>
+                        <div class="figure"><dt>{{ 'budget.back_typical'|trans }}</dt><dd>{{ item.budget.back|money(0) }}</dd></div>
+                        <div class="figure"><dt>{{ 'budget.loss_typical'|trans }}</dt><dd class="neg">{{ item.budget.lost|money(0) }}</dd></div>
+                    </dl>
+                    <span class="feature__text">{{ 'hub.f_budget'|trans({any: ui.chance(item.budget.any)|striptags|trim, jackpot: ui.chance(item.budget.jackpot)|striptags|trim}) }}</span>
+                </a>
+            </div>
+
+            {# Then the tools for the curious. #}
+            <h3 class="features__more">{{ 'hub.more_title'|trans }}</h3>
+            <div class="features features--small">
+                <a class="feature" href="{{ path('stats', {lottery: l.slug}) }}">
+                    <span class="feature__title"><svg class="icon"><use href="#i-stats"/></svg> {{ 'nav.stats'|trans }}</span>
+                    <span class="balls balls--sm">{% for n in item.hot %}<span class="ball d{{ n // 10 }}">{{ n }}</span>{% endfor %}</span>
+                    <span class="feature__text">{{ (item.random ? 'hub.f_stats_random' : 'hub.f_stats')|trans }}</span>
+                </a>
+                <a class="feature" href="{{ path('lab', {lottery: l.slug}) }}">
+                    <span class="feature__title"><svg class="icon"><use href="#i-lab"/></svg> {{ 'nav.lab'|trans }}</span>
+                    <span class="feature__question">{{ 'hub.f_lab_question'|trans }}</span>
+                    <span class="feature__text">{{ 'hub.f_lab'|trans({count: item.labDraws|integer}) }}</span>
+                </a>
+                <a class="feature" href="{{ path('draws', {lottery: l.slug}) }}">
+                    <span class="feature__title"><svg class="icon"><use href="#i-draws"/></svg> {{ 'nav.draws'|trans }}</span>
+                    <span class="feature__figure">{{ item.drawCount|integer }}</span>
+                    <span class="feature__text">{{ 'hub.f_draws'|trans({year: item.firstYear}) }}</span>
+                </a>
+                <a class="feature" href="{{ path('group', {lottery: l.slug}) }}">
+                    <span class="feature__title"><svg class="icon"><use href="#i-group"/></svg> {{ 'nav.group'|trans }}</span>
+                    <span class="feature__figure">{{ ui.chance(item.group.jackpot) }}</span>
+                    <span class="feature__text">{{ 'hub.f_group'|trans({people: item.group.people, grids: item.group.grids, single: ui.chance(item.group.single)|striptags|trim, share: item.group.perPerson|money}) }}</span>
+                </a>
+            </div>
+            {% endif %}
+        </section>
+    {% endfor %}
+
+    {% if planned is not empty %}
+        <section class="block">
+            <div class="block__head">
+                <h2>{{ 'hub.planned_title'|trans }}</h2>
+                <p>{{ 'hub.planned'|trans }}</p>
+            </div>
+            <ul class="lotteries">
+                {% for p in planned %}
+                    <li class="lottery is-planned">
+                        <span class="lottery__flag" aria-hidden="true">{{ p.region }}</span>
+                        <div><h3>{{ p.name }}</h3></div>
+                        <a class="btn btn--ghost btn--sm" href="{{ repo_url }}/issues/{{ p.issue }}">{{ 'hub.help_add'|trans({issue: p.issue}) }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    <section class="block">
+        <div class="block__head">
+            <h2>{{ 'hub.oss_title'|trans }}</h2>
+            <p>{{ 'hub.oss_text'|trans }}</p>
+        </div>
+        <div class="cols">
+            <div>
+                <h3>{{ 'hub.oss_selfhost'|trans }}</h3>
+                <p class="muted">{{ 'hub.oss_selfhost_text'|trans }}</p>
+                <pre class="terminal"><span class="prompt">$ </span>git clone {{ repo_url }}.git
+<span class="prompt">$ </span>cd looking-for-luck
+<span class="prompt">$ </span>docker compose up -d</pre>
+            </div>
+            <div>
+                <h3>{{ 'hub.oss_add'|trans }}</h3>
+                <p class="muted">{{ 'hub.oss_add_text'|trans }}</p>
+                <p style="margin-top: 12px"><a href="{{ repo_url }}/blob/main/CONTRIBUTING.md">{{ 'hub.oss_add_link'|trans }}</a></p>
+            </div>
+            <div>
+                <h3>{{ 'hub.oss_honest'|trans }}</h3>
+                <p class="muted">{{ 'hub.oss_honest_text'|trans }}</p>
+                <p style="margin-top: 12px"><a href="{{ repo_url }}/blob/main/LICENSE">{{ 'hub.oss_license'|trans }}</a></p>
+            </div>
+        </div>
+    </section>
+
+    {% include '_footer.html.twig' %}
+</main>
+{% endblock %}

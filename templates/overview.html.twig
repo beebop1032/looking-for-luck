@@ -1,0 +1,100 @@
+{% extends '_lottery.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% set shape = lottery.definition.bonusShape %}
+{% block title %}{{ lottery.name }}{% endblock %}
+
+{% block stage %}
+<section class="stage">
+    <div class="wrap stage__inner">
+        <p class="stage__kicker">{% if latest %}{{ 'overview.latest'|trans({date: latest.date|format_date(pattern: 'EEEE d MMMM y')}) }}{% else %}{{ 'overview.no_history'|trans }}{% endif %}</p>
+        <h1 class="{{ latest ? 'visually-hidden' }}">{{ lottery.name }}</h1>
+        {% if latest %}{{ ui.balls(latest.grid, shape, null, 'xl', true) }}{% endif %}
+        <div class="draw-board">
+            <dl class="draw-board__meta">
+                {% if nextJackpot %}
+                    <div>
+                        <dt>{{ 'overview.next_jackpot'|trans({date: nextJackpot.drawDate|format_date(pattern: 'EEEE d MMMM')}) }}</dt>
+                        <dd>{{ nextJackpot.amount|money(0) }}<small>{% if latest and latest.jackpot %}{{ (latest.jackpotWinners ? 'overview.previous_won' : 'overview.previous_rollover')|trans({amount: latest.jackpot|money(0), count: latest.jackpotWinners}) }}{% else %}{{ 'overview.announced'|trans }}{% endif %}</small></dd>
+                    </div>
+                {% elseif latest and latest.jackpot %}
+                    <div>
+                        <dt>{{ 'overview.jackpot'|trans }}</dt>
+                        <dd>{{ latest.jackpot|money(0) }}<small>{% if latest.jackpotWinners %}{{ 'overview.jackpot_won'|trans({count: latest.jackpotWinners}) }}{% else %}{{ 'overview.jackpot_rollover'|trans }}{% endif %}</small></dd>
+                    </div>
+                {% endif %}
+                <div>
+                    <dt>{{ 'overview.odds'|trans }}</dt>
+                    <dd>{{ 'budget.one_in'|trans({odds: lottery.jackpotOdds|integer}) }}<small>{{ 'overview.schedule_short'|trans({days: draw_days(lottery)}) }}</small></dd>
+                </div>
+            </dl>
+            <div class="countdown">
+                <span class="countdown__label">{{ 'overview.next_in'|trans }}</span>
+                {{ ui.countdown(lottery) }}
+                <span class="countdown__when">{{ lottery.nextDraw|format_datetime(pattern: 'EEEE d MMMM, HH:mm', timezone: lottery.game.drawTimezone) }}</span>
+                <form method="post" action="{{ path('sync', {lottery: lottery.slug}) }}" style="margin-top: 14px">
+                    <input type="hidden" name="_token" value="{{ csrf_token('sync') }}">
+                    <button class="btn btn--on-stage btn--sm"><svg class="icon"><use href="#i-refresh"/></svg> {{ 'overview.refresh'|trans }}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'nav.grids'|trans }}</h2>
+        <p>{{ grids is empty ? 'overview.no_grids'|trans : 'overview.grids_text'|trans }}</p>
+        {% if grids is not empty %}<a class="link" href="{{ path('grids', {lottery: lottery.slug}) }}">{{ 'overview.see_grids'|trans }}</a>{% endif %}
+    </div>
+    {% if grids is empty %}
+        <div><a class="btn btn--ghost" href="{{ path('grids', {lottery: lottery.slug}) }}"><svg class="icon"><use href="#i-plus"/></svg> {{ 'overview.add_grid'|trans }}</a></div>
+    {% else %}
+        <ul class="list">
+            {% for g in grids %}
+                <li>
+                    {{ ui.balls(g.saved.grid, shape, latest ? latest.grid : null) }}
+                    <span class="grow"></span>
+                    {% if g.last and g.last.rank %}<span class="tag tag--win">{{ 'common.tier'|trans({rank: g.last.rank}) }}</span>
+                    {% elseif g.last %}<span class="small muted">{{ 'common.matches'|trans({main: g.last.matchedMain, bonus: g.last.matchedBonus}) }}</span>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'overview.generate_title'|trans }}</h2>
+        <p>{{ 'overview.generate_text'|trans }}</p>
+    </div>
+    <form class="controls" action="{{ path('generate', {lottery: lottery.slug}) }}">
+        <label>{{ 'common.grids'|trans }}
+            <select name="count" class="w-sm">{% for n in [1, 2, 3, 5, 10] %}<option {{ n == 5 ? 'selected' }}>{{ n }}</option>{% endfor %}</select>
+        </label>
+        <button class="btn"><svg class="icon"><use href="#i-generate"/></svg> {{ 'overview.generate_btn'|trans }}</button>
+    </form>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'overview.recent'|trans }}</h2>
+        {% set sync = lottery.syncStatus.last %}
+        {% if sync %}<p>{{ 'overview.last_sync'|trans({date: sync.at|format_datetime('medium', 'short')}) }}{% if not sync.ok %} <span class="neg">{{ 'overview.sync_failed'|trans({message: sync.message}) }}</span>{% endif %}</p>{% endif %}
+        <a class="link" href="{{ path('draws', {lottery: lottery.slug}) }}">{{ 'overview.all_draws'|trans({year: lottery.draws.firstYear}) }}</a>
+    </div>
+    <ul class="list">
+        {% for draw in recent %}
+            <li>
+                <span class="list__date">{{ draw.date|format_date(pattern: 'EEE d MMM y') }}</span>
+                {{ ui.balls(draw.grid, shape, null, 'sm') }}
+                <span class="grow"></span>
+                {% if draw.jackpot %}<span class="small muted">{{ draw.jackpot|money(0) }}</span>{% endif %}
+            </li>
+        {% else %}
+            <li class="muted">{{ 'overview.no_history'|trans }}</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}

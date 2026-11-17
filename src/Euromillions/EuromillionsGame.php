@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Euromillions;
 
-use App\Lottery\Draw;
+use App\Lottery\DrawSchedule;
 use App\Lottery\LotteryGame;
 use App\Lottery\PrizeTier;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
@@ -58,6 +58,31 @@ final class EuromillionsGame implements LotteryGame
         return 2; // Tuesday and Friday
     }
 
+    public function drawDays(): array
+    {
+        return [2, 5]; // Tuesday and Friday
+    }
+
+    public function drawTime(): string
+    {
+        return '21:00';
+    }
+
+    public function drawTimezone(): string
+    {
+        return 'Europe/Paris';
+    }
+
+    public function currency(): string
+    {
+        return 'EUR';
+    }
+
+    public function currentRulesSince(): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable(self::STAR_RULES_SINCE);
+    }
+
     public function slipColumns(): int
     {
         return 5;
@@ -76,6 +101,11 @@ final class EuromillionsGame implements LotteryGame
     public function minimumJackpot(): float
     {
         return 17_000_000.0;
+    }
+
+    public function maximumJackpot(): float
+    {
+        return 250_000_000.0;
     }
 
     public function prizeTiers(): array
@@ -100,14 +130,10 @@ final class EuromillionsGame implements LotteryGame
     }
 
     /**
-     * @param list<Draw> $draws
-     *
-     * @return list<Draw> draws held under the current star rules
+     * The first draw strictly after the given moment (in Paris time).
      */
-    public function drawsUnderCurrentStarRules(array $draws): array
+    public function nextDrawAfter(\DateTimeImmutable $moment): \DateTimeImmutable
     {
-        $since = new \DateTimeImmutable(self::STAR_RULES_SINCE);
-
-        return array_values(array_filter($draws, static fn (Draw $d): bool => $d->date >= $since));
+        return DrawSchedule::nextAfter($this, $moment);
     }
 }

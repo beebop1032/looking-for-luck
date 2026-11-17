@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Euromillions;
-
-use App\Lottery\Grid;
+namespace App\Lottery;
 
 /**
- * A grid the user saved locally, with its bookkeeping dates.
+ * A grid the user saved locally, with its bookkeeping dates: when it was
+ * saved, and the date of the last draw it was checked against.
  */
 final class SavedGrid
 {
@@ -15,7 +14,7 @@ final class SavedGrid
         public readonly int $id,
         public readonly Grid $grid,
         public readonly \DateTimeImmutable $createdAt,
-        public readonly ?\DateTimeImmutable $lastCheckedAt,
+        public readonly ?\DateTimeImmutable $lastDrawChecked,
     ) {
     }
 }

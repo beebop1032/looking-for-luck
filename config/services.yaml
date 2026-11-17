@@ -4,6 +4,28 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # Languages of the web interface (the first one is the fallback).
+    app.locales: [en, fr, nl, es, de]
+    # Where draws, saved grids and sync status are stored (a Docker volume in
+    # production): each lottery uses <data root>/<slug>/.
+    app.data_root: '%env(default:app.default_data_root:LFL_DATA_ROOT)%'
+    app.default_data_root: '%kernel.project_dir%/var'
+    # EuroMillions data, used by the app:euromillions:* commands.
+    app.data_dir: '%app.data_root%/euromillions'
+
+    # Public home of the project, linked from the web interface.
+    app.repository_url: 'https://github.com/beebop1032/looking-for-luck'
+    app.version: '%env(default:app.default_version:LFL_VERSION)%'
+    app.default_version: 'dev'
+    # Country whose mandatory gambling warning is shown (fr, be…); empty = from the browser language region.
+    app.country: '%env(default:app.default_country:LFL_COUNTRY)%'
+    app.default_country: ''
+
+    # On the roadmap, waiting for a contributor (shown in the web interface).
+    app.planned_lotteries:
+        - { name: 'Eurojackpot', region: '🇪🇺', issue: 4 }
+        - { name: 'Powerball', region: '🇺🇸', issue: 2 }
+        - { name: 'Mega Millions', region: '🇺🇸', issue: 3 }
 
 services:
     # default configuration for services in *this* file
@@ -19,6 +41,22 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+            # Built per lottery by LotteryRegistry, not a shared service.
+            - '../src/Lottery/Lottery.php'
+
+    # Must run before Symfony's resolver that would inject the raw {lottery} string.
+    App\Web\LotteryValueResolver:
+        tags:
+            - { name: controller.argument_value_resolver, priority: 150 }
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+when@test:
+    services:
+        test.http_client.not_found:
+            class: App\Tests\Fixtures\NotFoundHttpResponder
+
+    parameters:
+        # Tests write their own fixtures here: never touch the real data.
+        app.data_root: '%kernel.project_dir%/var/test-data'

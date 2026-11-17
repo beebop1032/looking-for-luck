@@ -20,7 +20,7 @@ final class Statistics
     /**
      * @param list<Draw> $draws
      *
-     * @return array<int,int> number => times drawn (complete over the main pool)
+     * @return non-empty-array<int,int> number => times drawn (complete over the main pool)
      */
     public function mainFrequencies(array $draws): array
     {
@@ -30,7 +30,7 @@ final class Statistics
     /**
      * @param list<Draw> $draws
      *
-     * @return array<int,int> bonus number => times drawn (complete over the bonus pool)
+     * @return non-empty-array<int,int> bonus number => times drawn (complete over the bonus pool)
      */
     public function bonusFrequencies(array $draws): array
     {
@@ -42,7 +42,7 @@ final class Statistics
      *
      * @param list<Draw> $draws sorted oldest to newest
      *
-     * @return array<int,int> number => gap (count($draws) if never drawn)
+     * @return non-empty-array<int,int> number => gap (count($draws) if never drawn)
      */
     public function mainGaps(array $draws): array
     {
@@ -52,7 +52,7 @@ final class Statistics
     /**
      * @param list<Draw> $draws
      *
-     * @return array<int,int>
+     * @return non-empty-array<int,int>
      */
     public function bonusGaps(array $draws): array
     {
@@ -105,9 +105,10 @@ final class Statistics
 
     /**
      * @param list<Draw> $draws
+     * @param positive-int $pool
      * @param callable(Draw): list<int> $values
      *
-     * @return array<int,int>
+     * @return non-empty-array<int,int>
      */
     private function frequencies(array $draws, int $pool, callable $values): array
     {
@@ -123,9 +124,10 @@ final class Statistics
 
     /**
      * @param list<Draw> $draws
+     * @param positive-int $pool
      * @param callable(Draw): list<int> $values
      *
-     * @return array<int,int>
+     * @return non-empty-array<int,int>
      */
     private function gaps(array $draws, int $pool, callable $values): array
     {
@@ -138,11 +140,9 @@ final class Statistics
             }
         }
 
-        $gaps = [];
-        for ($value = 1; $value <= $pool; ++$value) {
-            $gaps[$value] = -1 === $lastSeen[$value] ? $total : $total - 1 - $lastSeen[$value];
-        }
-
-        return $gaps;
+        return array_map(
+            static fn (int $seen): int => -1 === $seen ? $total : $total - 1 - $seen,
+            $lastSeen,
+        );
     }
 }

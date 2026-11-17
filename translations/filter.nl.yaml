@@ -1,0 +1,7 @@
+# Anti-sharing filter reasons (ids are the English messages of PopularityFilter).
+"all numbers are multiples of the same value": "alle nummers zijn veelvouden van hetzelfde getal"
+"all numbers ≤ 31 (\"birthday\" grids, heavily played)": "alle nummers ≤ 31 (verjaardagsroosters, heel populair)"
+"arithmetic sequence (e.g. 5-10-15-20-25), a very popular pattern": "rekenkundige reeks (bv. 5-10-15-20-25), een heel populair patroon"
+"combination already drawn in a past draw (often replayed)": "combinatie die al eens getrokken is (wordt vaak opnieuw gespeeld)"
+"four or more consecutive numbers": "vier of meer opeenvolgende nummers"
+"visual pattern on the paper slip (column, row or diagonal)": "visueel patroon op het formulier (kolom, rij of diagonaal)"

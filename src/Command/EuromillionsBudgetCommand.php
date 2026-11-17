@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Euromillions\DrawRepository;
+use App\Intl\Format;
 use App\Lottery\BudgetSimulator;
 use App\Lottery\PrizeTable;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -19,9 +21,12 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class EuromillionsBudgetCommand extends Command
 {
+    use TranslatesOutput;
+
     public function __construct(
         private readonly BudgetSimulator $simulator,
         private readonly PrizeTable $prizeTable,
+        private readonly DrawRepository $repository,
     ) {
         parent::__construct();
     }
@@ -31,9 +36,9 @@ final class EuromillionsBudgetCommand extends Command
         $this
             ->addOption('years', null, InputOption::VALUE_REQUIRED, 'Number of simulated years of play', '10')
             ->addOption('price', null, InputOption::VALUE_REQUIRED, 'Price of one grid in euros', '2.5')
-            ->addOption('grids-per-draw', null, InputOption::VALUE_REQUIRED, 'Grids played at each draw (2 draws/week)', '1')
+            ->addOption('grids-per-draw', null, InputOption::VALUE_REQUIRED, 'Grids played at each draw', '1')
             ->addOption('simulations', null, InputOption::VALUE_REQUIRED, 'Number of Monte Carlo trajectories', '10000')
-            ->addOption('jackpot', null, InputOption::VALUE_REQUIRED, 'Jackpot amount used for tier 1 (€)', '50000000');
+            ->addOption('jackpot', null, InputOption::VALUE_REQUIRED, 'Jackpot amount used for tier 1 (€); default: the jackpot announced for the next draw');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,9 +49,12 @@ final class EuromillionsBudgetCommand extends Command
         $price = InputValue::float($input->getOption('price'));
         $gridsPerDraw = InputValue::int($input->getOption('grids-per-draw'));
         $simulations = max(1_000, min(200_000, InputValue::int($input->getOption('simulations'))));
-        $jackpot = InputValue::float($input->getOption('jackpot'));
+        $jackpotOption = $input->getOption('jackpot');
+        $jackpot = null !== $jackpotOption
+            ? InputValue::float($jackpotOption)
+            : ($this->repository->nextJackpot()->amount ?? null);
 
-        $table = $this->prizeTable->withJackpot($jackpot);
+        $table = null !== $jackpot ? $this->prizeTable->withJackpot($jackpot) : $this->prizeTable;
 
         try {
             $result = $this->simulator->simulate($years, $gridsPerDraw, $price, $simulations, $table);
@@ -56,58 +64,69 @@ final class EuromillionsBudgetCommand extends Command
             return Command::INVALID;
         }
 
-        $io->title(\sprintf(
-            'Budget simulator — %d year(s), %d grid(s) per draw at %.2f €',
-            $years,
-            $gridsPerDraw,
-            $price,
-        ));
+        $chances = $this->simulator->chances($result['gridsPlayed'], $table);
+        $perWeek = $result['totalCost'] / ($years * 52);
+        $back = $result['wonBack'];
 
-        $io->section('Probabilities and average prizes per tier');
+        Ui::banner($output, $this->t('budget.title'), $this->t('budget.subtitle', [
+            'years' => $years,
+            'grids' => $gridsPerDraw,
+            'price' => Format::money($price),
+            'jackpot' => Format::money($table->prizeFor(1), 0),
+        ]));
+
+        $io->section($this->t('budget.spend_title'));
+        $io->writeln('  '.$this->t('budget.spend_line', [
+            'week' => '<options=bold>'.Format::money($perWeek).'</>',
+            'year' => '<options=bold>'.Format::money($perWeek * 52, 0).'</>',
+            'years' => $years,
+            'total' => '<options=bold>'.Format::money($result['totalCost'], 0).'</>',
+            'grids' => Format::integer($result['gridsPlayed']),
+        ]));
+
+        $io->section($this->t('budget.chances_title', ['years' => $years]));
+        $io->writeln('  '.$this->t('budget.any_prize', [
+            'chance' => '<options=bold>'.Ui::chance($chances['any']['atLeastOnce']).'</>',
+            'count' => Format::integer($chances['any']['expectedWins']),
+        ]));
+        $io->writeln('  '.$this->t('budget.jackpot_chance', [
+            'chance' => '<fg=#ffc83d;options=bold>'.Ui::chance($chances['tiers'][0]['atLeastOnce']).'</>',
+            'odds' => Format::integer(1 / $chances['tiers'][0]['probabilityPerGrid']),
+        ]));
+        $io->newLine();
+
         $rows = [];
-        foreach ($table->ranks() as $rank) {
+        foreach ($chances['tiers'] as $tier) {
             $rows[] = [
-                $rank['rank'],
-                \sprintf('%d + %d', $rank['main'], $rank['bonus']),
-                '1 / '.number_format($rank['odds'], $rank['odds'] < 100 ? 1 : 0),
-                Format::money($rank['averagePrize']),
+                '<options=bold>'.$tier['rank'].'</>',
+                str_repeat('●', $tier['main']).str_repeat('○', 5 - $tier['main']).'  '.str_repeat('<fg=#ffc83d>★</>', $tier['bonus']).str_repeat('<fg=gray>☆</>', 2 - $tier['bonus']),
+                Format::money($tier['averagePrize'], 0),
+                Ui::chance($tier['atLeastOnce']),
+                $tier['expectedWins'] >= 0.1 ? Format::decimal($tier['expectedWins'], $tier['expectedWins'] < 10 ? 1 : 0) : '< '.Format::decimal(0.1, 1),
             ];
         }
-        $io->table(['Tier', 'Matched numbers + stars', 'Probability', 'Indicative average prize'], $rows);
-        $io->text(\sprintf(
-            'Probability of winning anything at one draw: <info>1 / %.1f</info>. '.
-            'Expected prize per grid: <info>%s</info> for %s staked.',
-            1 / $table->anyWinProbability(),
-            Format::money($result['expectedPrizePerGrid']),
-            Format::money($price),
-        ));
+        $io->table([
+            $this->t('budget.col_tier'),
+            $this->t('budget.col_match'),
+            $this->t('budget.col_prize'),
+            $this->t('budget.col_at_least_once', ['years' => $years]),
+            $this->t('budget.col_times'),
+        ], $rows);
 
-        $io->section(\sprintf('Monte Carlo — %s trajectories of %d year(s)', Format::integer($simulations), $years));
-        $io->table(['', 'Value'], [
-            ['Grids played', Format::integer($result['gridsPlayed'])],
-            ['Total stakes', Format::money($result['totalCost'])],
-            ['<options=bold>Expected result (analytic)</>', '<options=bold>'.Format::money($result['expectedNet']).'</>'],
-            ['Worst trajectory', Format::money($result['worst'])],
-            ['5th percentile', Format::money($result['percentiles']['p5'])],
-            ['25th percentile', Format::money($result['percentiles']['p25'])],
-            ['Median', Format::money($result['median'])],
-            ['75th percentile', Format::money($result['percentiles']['p75'])],
-            ['95th percentile', Format::money($result['percentiles']['p95'])],
-            ['Best trajectory', Format::money($result['best'])],
-            ['Trajectories ending in profit', \sprintf('%.2f %%', 100 * $result['probabilityPositive'])],
-        ]);
+        $io->section($this->t('budget.back_title', ['count' => Format::integer($simulations)]));
+        $io->writeln('  '.$this->t('budget.back_line', [
+            'staked' => '<options=bold>'.Format::money($result['totalCost'], 0).'</>',
+            'back' => '<options=bold>'.Format::money($back['median'], 0).'</>',
+            'loss' => '<fg=#ff5f5f;options=bold>'.Format::money($result['totalCost'] - $back['median'], 0).'</>',
+        ]));
+        $io->writeln('  '.$this->t('budget.back_range', [
+            'low' => '<options=bold>'.Format::money($back['p5'], 0).'</>',
+            'high' => '<options=bold>'.Format::money($back['p95'], 0).'</>',
+        ]));
+        $io->writeln('  '.$this->t('budget.profit_lives', ['percent' => '<options=bold>'.Format::decimal(100 * $result['probabilityPositive'], 2).' %</>']));
+        $io->newLine();
 
-        $io->note(\sprintf(
-            'In plain language: over %d year(s), you stake %s and should expect to lose about %s '.
-            '(half of the trajectories lose more than %s). With the indicative average prizes '.
-            'used here, about %.0f %% of every euro staked comes back as prizes: '.
-            'it is entertainment, not an investment.',
-            $years,
-            Format::money($result['totalCost']),
-            Format::money(abs($result['expectedNet'])),
-            Format::money(abs($result['median'])),
-            100 * $result['expectedPrizePerGrid'] / $price,
-        ));
+        Ui::note($output, $this->t('budget.average_note', ['percent' => Format::integer(100 * $result['expectedPrizePerGrid'] / $price)]));
 
         return Command::SUCCESS;
     }

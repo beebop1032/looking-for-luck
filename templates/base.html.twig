@@ -1,0 +1,74 @@
+{% set cl = current_lottery() %}
+<!DOCTYPE html>
+<html lang="{{ app.request.locale }}"{% if cl %} style="--lottery-stage: {{ cl.definition.accentColor }}"{% endif %}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{% endblock %} – Looking for Luck</title>
+    <meta name="description" content="{{ 'hub.lead'|trans }}">
+    <meta name="theme-color" content="#0b1446">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15.5' fill='%23f7b500'/%3E%3Ccircle cx='16' cy='16' r='11.5' fill='%23fff'/%3E%3Cg fill='%2317a673'%3E%3Ccircle cx='13' cy='13' r='3.4'/%3E%3Ccircle cx='19' cy='13' r='3.4'/%3E%3Ccircle cx='13' cy='19' r='3.4'/%3E%3Ccircle cx='19' cy='19' r='3.4'/%3E%3C/g%3E%3C/svg%3E">
+    <script>
+        // Apply the saved (or system) theme before the first paint.
+        (function () {
+            var theme = null;
+            try { theme = localStorage.getItem('lfl-theme'); } catch (e) {}
+            if (theme !== 'light' && theme !== 'dark') {
+                theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.dataset.theme = theme;
+        })();
+    </script>
+    <link rel="preload" href="/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+{% include '_icons.html.twig' %}
+{% set notice = gambling_notice() %}
+<aside class="warning" role="note" lang="{{ notice.lang }}">
+    <div class="warning__inner wrap">
+        <span class="warning__age">{{ notice.age }}</span>
+        <p>{{ notice.text }}{% if notice.help %} <a href="{{ notice.url }}" rel="noopener">{{ notice.help }}</a>{% endif %}</p>
+    </div>
+</aside>
+{% block page %}{% endblock %}
+<script>
+    // Theme toggle.
+    document.addEventListener('click', function (event) {
+        var toggle = event.target.closest('[data-theme-toggle]');
+        if (toggle) {
+            var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = next;
+            try { localStorage.setItem('lfl-theme', next); } catch (e) {}
+        }
+        // Copy a grid to the clipboard.
+        var copy = event.target.closest('[data-copy]');
+        if (copy && navigator.clipboard) {
+            navigator.clipboard.writeText(copy.dataset.copy).then(function () {
+                var label = copy.querySelector('[data-label]');
+                if (!label) return;
+                var before = label.textContent;
+                label.textContent = copy.dataset.copied;
+                setTimeout(function () { label.textContent = before; }, 1600);
+            });
+        }
+    });
+
+    // Live countdown to the next draw.
+    (function () {
+        var nodes = document.querySelectorAll('[data-countdown]');
+        if (!nodes.length) return;
+        var pad = function (n) { return String(n).padStart(2, '0'); };
+        function tick() {
+            nodes.forEach(function (node) {
+                var left = Math.max(0, Math.floor((Date.parse(node.dataset.countdown) - Date.now()) / 1000));
+                var days = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60), s = left % 60;
+                node.textContent = (days ? days + node.dataset.day + ' ' : '') + pad(h) + ':' + pad(m) + ':' + pad(s);
+            });
+        }
+        tick();
+        setInterval(tick, 1000);
+    })();
+</script>
+</body>
+</html>

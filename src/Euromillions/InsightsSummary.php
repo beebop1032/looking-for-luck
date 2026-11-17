@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Euromillions;
 
 use App\Lottery\Draw;
+use App\Lottery\GridStore;
+use App\Lottery\Lottery;
 use App\Lottery\PrizeTable;
 use App\Lottery\Statistics;
 
@@ -46,7 +48,7 @@ final class InsightsSummary
             $lines[] = $this->rankingLine('Least drawn numbers', $this->statistics->mainFrequencies($draws), false);
             $lines[] = $this->gapsLine($this->statistics->mainGaps($draws));
 
-            $starDraws = $this->game->drawsUnderCurrentStarRules($draws);
+            $starDraws = Lottery::underCurrentRules($this->game, $draws);
             $mainTest = $this->statistics->uniformityTest($this->statistics->mainFrequencies($draws));
             $starTest = $this->statistics->uniformityTest($this->statistics->bonusFrequencies($starDraws));
             $lines[] = \sprintf(

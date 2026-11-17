@@ -11,3 +11,5 @@ var/
 .phpunit.cache
 Dockerfile
 compose.yaml
+.playwright-mcp/
+docs/

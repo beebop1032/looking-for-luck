@@ -1,170 +1,203 @@
 # 🍀 Looking for Luck
 
-**The honest lottery toolkit.** Statistics, cryptographically secure grid
-generation, strategy backtesting and Monte Carlo budget simulation — for
-people who enjoy playing the lottery *and* want to understand exactly what
-they're playing with.
+**The honest lottery toolkit.** Generate fair grids, follow every draw, check
+your tickets automatically and see what the hobby really costs — in a web app
+you run at home with one Docker command, or from the terminal.
 
 [![CI](https://github.com/beebop1032/looking-for-luck/actions/workflows/ci.yml/badge.svg)](https://github.com/beebop1032/looking-for-luck/actions/workflows/ci.yml)
 ![PHP](https://img.shields.io/badge/PHP-%E2%89%A5%208.4-777BB4?logo=php&logoColor=white)
 ![Symfony](https://img.shields.io/badge/Symfony-8-000000?logo=symfony)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 ![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)
+![Languages](https://img.shields.io/badge/UI-EN%20%C2%B7%20FR%20%C2%B7%20NL%20%C2%B7%20ES%20%C2%B7%20DE-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> **The honest part:** no tool in this project improves your odds of winning.
-> Every draw is independent, the expected value of a ticket is negative, and
-> our own chi-squared test confirms the draws are compatible with pure
-> randomness. What this toolkit *does* do: generate unbiased grids that you're
-> less likely to have to **share** a jackpot with, show you what any
-> "hot numbers" strategy is really worth, and tell you what your hobby costs
-> over 10 years. Play for fun, never for profit.
+![The Looking for Luck home page: the latest EuroMillions draw as lottery balls on a dark blue stage, then every tool of the app with a live preview](docs/screenshots/home.png)
 
----
+> **The honest part:** nothing in this project improves your odds of winning.
+> Every draw is independent, a ticket's expected value is negative, and our
+> own χ² test confirms the draws are compatible with pure randomness. What it
+> *does* do: generate grids you're less likely to **share** a jackpot with,
+> show what any "hot numbers" strategy is really worth, and tell you what
+> your hobby costs over ten years. Play for fun, never for profit.
 
-## ✨ Features
-
-🎲 **Grid generator** — grids drawn with PHP's CSPRNG (`random_int()`), then
-passed through an **anti-sharing filter** that rejects combinations crowds
-love to play: all-birthday numbers (≤ 31), arithmetic sequences, visual
-patterns on the paper slip (columns, rows, diagonals), shared multiples, and
-combinations that already won. Your odds don't change — your expected share of
-a jackpot does.
-
-📊 **Statistics** — frequencies, overdue numbers, most frequent pairs over the
-**full draw history (since 2004)**, plus a **chi-squared test** explained in
-plain language that shows whether the observed distribution is compatible with
-pure randomness. (Spoiler: it is.)
-
-🧪 **Strategy lab** — pick a strategy (*hot*, *cold*, *overdue*, *random*) and
-replay it over two decades of real draws — using only information available
-before each draw — against **10,000 simulated random players**. See its
-winnings, losses, and exactly where it lands in the distribution.
-
-💸 **Budget simulator** — exact per-tier probabilities (hypergeometric, down
-to the official 1 in 139,838,160), configurable ticket price and jackpot, and
-a Monte Carlo simulation of N years of play: median outcome, percentiles,
-expected loss, probability of ending in profit.
-
-🎟️ **My grids** — save the grids you actually play and check them
-automatically against every new draw.
-
-🤖 **AI assistant (optional)** — drop an Anthropic API key in `.env.local`
-and chat with Claude about *your* data: it receives a factual summary
-(statistics, chi-squared verdict, prize maths, your saved grids) and discusses
-it honestly — it will kindly refuse to "predict" anything. No key, no problem:
-everything else works without it.
-
-## 🚀 Quick start
+## 🚀 Run it at home
 
 ```bash
 git clone https://github.com/beebop1032/looking-for-luck.git
 cd looking-for-luck
-composer install
+docker compose up -d
 ```
 
-Or with Docker (no PHP needed):
+Open **<http://localhost:8090>**. That's it: one container serves the web
+interface ([FrankenPHP](https://frankenphp.dev)) and runs a scheduler
+([supercronic](https://github.com/aptible/supercronic)) that fetches every new
+draw and checks your saved grids. Your data stays on your machine, in the
+`lottery-data` volume.
+
+- Another port: `LFL_PORT=9000 docker compose up -d`
+- The interface has no login: keep it on your machine or home network, not
+  on the open internet.
+
+## ✨ What's inside
+
+| | |
+|---|---|
+| **Overview** — the latest draw lands on the stage, ball by ball, with the jackpot announced for the next draw, the real odds and a live countdown. | ![Overview](docs/screenshots/overview.png) |
+| **Generate** — grids drawn by a cryptographically secure generator, then passed through an **anti-sharing filter** that throws away what crowds play: birthdays (all ≤ 31), sequences, patterns on the paper slip, shared multiples, past winning combinations — and shows you the grids it threw away, and why. Your odds don't change; your expected share of a jackpot does. | ![Generate](docs/screenshots/generate.png) |
+| **Statistics** — frequencies, longest absences and pairs over the **full history since 2004** or any exact date range, a heatmap, and a χ² test explained in plain language. (Spoiler: the draws are random.) | ![Statistics](docs/screenshots/stats.png) |
+| **Draws** — every draw since 2004, with jackpots and winners. Type one of your grids to replay it on two decades of draws: what doesn't match fades away. Light and dark themes. | ![Draw history in dark mode](docs/screenshots/draws-dark.png) |
+
+Also in the box:
+
+- 🎟️ **My grids** — save the grids you play, simple or multiple (up to 10
+  numbers and 12 stars); every combination they contain is checked after each
+  draw, with every prize won and your indicative balance.
+- 👥 **Play as a group** — friends share a multiple grid (7 numbers + 3
+  stars = 63 combinations…): exact chances for the group at each draw and
+  over the years, each person's share, and the honest answer — the group wins
+  more often but shares every prize; each euro is worth exactly the same as
+  when playing alone.
+- 💸 **Budget** — what you spend per week, per year and over N years; your
+  exact chances of winning each prize *at least once* over the whole period
+  (and how many times on average); and what a typical player gets back,
+  from 10,000 simulated lives — without the misleading "average" that the
+  jackpot inflates.
+- 🧪 **Strategy lab** — replay *hot*, *cold*, *overdue* or *random* picks on
+  the whole history (using only what was known before each draw) against
+  10,000 random players, and see where the strategy really lands.
+- 🌍 **Five languages** — 🇬🇧 English, 🇫🇷 French, 🇳🇱 Dutch, 🇪🇸 Spanish and
+  🇩🇪 German, in the web interface (it follows your browser and remembers your
+  choice) and in the terminal (`--locale=fr`).
+- 📱 **Works on your phone.**
+
+![The interface on a phone](docs/screenshots/mobile.png)
+
+## 🎰 Lotteries
+
+The engine knows nothing about any particular lottery: a lottery is a matrix
+(numbers + bonus numbers), a prize table, a draw schedule and a draw source.
+Add one, and every page of the web interface, the scheduled sync and the
+statistics work for it with no other code.
+
+| Lottery | Status |
+|---|---|
+| 🇪🇺 EuroMillions | ✅ Supported |
+| 🇪🇺 Eurojackpot | 🙋 Looking for a contributor — [#4](https://github.com/beebop1032/looking-for-luck/issues/4) |
+| 🇺🇸 Powerball | 🙋 Looking for a contributor — [#2](https://github.com/beebop1032/looking-for-luck/issues/2) |
+| 🇺🇸 Mega Millions | 🙋 Looking for a contributor — [#3](https://github.com/beebop1032/looking-for-luck/issues/3) |
+| 🇬🇧 UK Lotto, 🇫🇷 Loto, 🇧🇪 Lotto… | Open to pull requests |
+
+Lotteries waiting for a contributor are listed in the interface too, with a
+link to their issue. **[CONTRIBUTING.md](CONTRIBUTING.md) walks you through
+adding one** — it is mostly data, and the tests tell you when the odds are
+right.
+
+## ⌨️ Command line
+
+Everything also works in the terminal, with colourful output (lottery balls,
+bars, heatmaps):
 
 ```bash
-docker compose run --rm app app:euromillions:predict 5
-```
+composer install                                   # or prefix with: docker compose run --rm app
 
-```bash
-# Generate 5 grids (CSPRNG + anti-sharing filter)
-bin/console app:euromillions:predict 5
-
-# Full-history statistics with the chi-squared test
-bin/console app:euromillions:stats
-
-# Backtest "hot numbers" against 10,000 random players
-bin/console app:euromillions:lab hot
-
-# What does 10 years of playing actually cost?
-bin/console app:euromillions:budget --years=10
-
-# Save your grids and check them after every draw
+bin/console app:euromillions:predict 5             # 5 grids, anti-sharing filter on
+bin/console app:euromillions:stats                 # full-history statistics + χ² test
+bin/console app:euromillions:lab hot               # backtest "hot numbers" vs 10,000 players
+bin/console app:euromillions:budget --years=10     # what does 10 years of playing cost?
 bin/console app:euromillions:grids add "1 9 23 34 48 + 3 7"
 bin/console app:euromillions:grids check
+bin/console app:sync                               # fetch new draws + check grids, all lotteries
 
-# Optional: chat with an AI about your data (needs ANTHROPIC_API_KEY)
-bin/console app:euromillions:ask "Why does number 44 come up so often?"
-bin/console app:euromillions:ask            # interactive chat
+php -S 127.0.0.1:8000 -t public                    # the web interface, without Docker
 ```
 
-The draw history is downloaded once and cached under `var/euromillions/`
-(6-hour TTL for the current year, permanent for past years), with a graceful
-fallback to a stale cache when offline.
+**In your language:** add `--locale=fr` (or `nl`, `es`, `de`) to any command,
+or set `LFL_LOCALE=fr` (`LC_ALL` and `LC_MESSAGES` work too). Amounts and
+dates follow the language. Output stays in English unless you ask: `LANG`
+alone does not switch it.
 
-## 🧱 Architecture: one engine, many lotteries
+```bash
+bin/console app:euromillions:budget --years=10 --locale=fr
+LFL_LOCALE=de docker compose run --rm app app:euromillions:stats
+```
 
-The engine is **lottery-agnostic**: everything generic lives in
-`src/Lottery/` and only knows a game through the `LotteryGame` interface
-(pool sizes, picks, prize tiers, slip layout). EuroMillions is the first
-implementation.
+**Optional AI assistant:** put an Anthropic API key in `.env.local` and chat
+with Claude about *your* data with `bin/console app:euromillions:ask`. It gets
+a factual summary (statistics, χ² verdict, prize maths, your grids) and
+kindly refuses to "predict" anything. Everything else works without it.
+
+## 🧱 How it's built
+
+Symfony 8 and Twig, no JavaScript build step, no database: draws and grids are
+small JSON files, revalidated every time they are read.
+
+The design ("draw night") borrows from televised lottery draws: a dark blue
+stage where the balls land, and a calm page below it. Colour belongs to the
+balls — coloured by tens, with the white centre disc of real lottery balls —
+and everything else is ink, paper and rules. One self-hosted typeface,
+[Archivo](https://fonts.google.com/specimen/Archivo), used across its width
+axis. The whole design system is one hand-written stylesheet.
 
 ```
 src/
-├── Lottery/                  # generic engine — no EuroMillions knowledge
-│   ├── LotteryGame.php        # the interface a lottery implements
-│   ├── PrizeTier.php          # one winning tier (matches + average prize)
-│   ├── Grid.php               # validated value object (main + bonus numbers)
-│   ├── Draw.php               # a dated historical draw
-│   ├── GridGenerator.php      # CSPRNG sampling
-│   ├── PopularityFilter.php   # the anti-sharing rules
-│   ├── PrizeTable.php         # exact hypergeometric tier probabilities
-│   ├── Statistics.php         # frequencies, gaps, pairs
-│   ├── ChiSquare.php          # χ² test, p-value via incomplete gamma (no deps)
-│   ├── StrategyLab.php        # historical replay vs random cohort
-│   ├── BudgetSimulator.php    # Monte Carlo trajectories
-│   ├── WinSampler.php         # fast binomial sampling via geometric skips
-│   └── Percentile.php         # shared percentile maths
-├── Euromillions/              # the EuroMillions adapter
-│   ├── EuromillionsGame.php   # 5/50 + 2/12 matrix, 13 prize tiers
-│   ├── DrawRepository.php     # full-history fetcher + on-disk cache
-│   ├── GridStore.php          # local "my grids" storage
-│   └── SavedGrid.php          # a saved grid with bookkeeping dates
-└── Command/                   # 5 thin console commands
+├── Lottery/                    # the engine — knows no specific lottery
+│   ├── LotteryGame.php          # a matrix: pools, picks, prize tiers, schedule, currency
+│   ├── DrawSource.php           # where a lottery's draws come from
+│   ├── LotteryDefinition.php    # registers a lottery with the web app and the sync
+│   ├── LotteryRegistry.php      # every registered lottery (+ the roadmap)
+│   ├── Lottery.php              # one lottery with its engine wired to its own data
+│   ├── GridGenerator.php        # cryptographically secure sampling (random_int)
+│   ├── PopularityFilter.php     # the anti-sharing rules
+│   ├── PrizeTable.php           # exact hypergeometric odds per tier
+│   ├── Statistics.php, ChiSquare.php
+│   ├── StrategyLab.php, BudgetSimulator.php, WinSampler.php
+│   ├── GridStore.php, GridInput.php, Synchronizer.php, DrawSchedule.php
+│   └── Grid.php, Draw.php, PrizeTier.php, …
+├── Euromillions/               # the EuroMillions adapter: game, CSV draw source, definition
+├── Command/                    # console commands + Ui (balls, bars, colours)
+├── Controller/                 # thin web controllers, one URL space per lottery: /euromillions/…
+└── Web/                        # Twig helpers, language detection
+templates/                      # Twig templates
+translations/                   # web (messages+intl-icu.*) and terminal (cli+intl-icu.*) strings, per language
+public/css/app.css              # the whole design system, hand-written
 ```
 
-**Adding a lottery** (Powerball, Mega Millions, Eurojackpot…) means
-implementing `LotteryGame` (a matrix + a prize table) and a draw source.
-The generator, filter, prize maths, lab and simulator come for free.
-Contributions welcome:
-
-- 🇪🇺 **EuroMillions** — done
-- 🇺🇸 **Powerball** / **Mega Millions** — planned
-- 🇪🇺 **Eurojackpot** — planned
-- 🇬🇧 **UK Lotto**, 🇫🇷 **Loto**, 🇧🇪 **Belgian Lotto**… — open to PRs
+Data lives in `var/<lottery>/` (or `$LFL_DATA_ROOT/<lottery>/`). The draw
+history is downloaded once (one CSV per year), refreshed only when a draw is
+due, and falls back to the cache when offline; an empty or unparseable answer
+never overwrites a good cache.
 
 ## ✅ Quality
 
 ```bash
-vendor/bin/phpunit            # test suite
+vendor/bin/phpunit            # unit + web tests (every page, every language)
 vendor/bin/phpstan analyse    # static analysis, level max
 vendor/bin/php-cs-fixer fix   # coding standards (@Symfony + risky)
 ```
 
-CI runs the test suite on PHP 8.4 / 8.5, PHPStan at level **max**,
-php-cs-fixer, `composer audit` and a Docker image build on every push and
-pull request. The tests
-cover the chi-squared quantiles, the official odds, the sum of all outcome
-probabilities (= 1), every popularity-filter rule, and generator validity.
+CI runs the tests on PHP 8.4 and 8.5, PHPStan at level **max**,
+php-cs-fixer, `composer audit`, and builds the Docker image and checks that
+the web interface answers. The tests cover the χ² quantiles, the official
+odds (to the digit), the sum of all outcome probabilities (= 1), every filter
+rule, the draw schedule, the CSV parser, every page in all five languages, and
+that every language defines every string.
 
-## 🔒 Security posture
+## 🔒 Security
 
-- Symfony 8, `composer audit` clean in CI.
-- HTTP through the HttpClient component: TLS verified, timeouts, capped
-  redirects, single hard-coded host.
-- Every piece of external data (scraped HTML, JSON caches, grid file) is
-  revalidated before use; all writes are atomic.
-- Real grids come from `random_int()` (CSPRNG) — simulations use a fast PRNG,
-  clearly separated.
+- `composer audit` clean in CI; HTTP through Symfony's HttpClient (TLS
+  verified, timeouts, capped redirects, a single hard-coded host).
+- Every piece of external data (downloaded CSV, JSON caches, grid files) is
+  validated before use; all writes are atomic.
+- Web forms are CSRF-protected; the container runs as an unprivileged user.
+- Real grids come from `random_int()`; simulations use a fast PRNG, clearly
+  separated.
 
 ## 🤝 Contributing
 
-Issues and PRs are welcome — especially new lottery adapters, better prize
-data, and translations. **[CONTRIBUTING.md](CONTRIBUTING.md) has a 3-step
-guide to adding a lottery.** Keep the tone of the project: the maths stays
+Issues and pull requests are welcome — especially **new lotteries**, better
+prize data, **translations** and design feedback. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md). One rule above all: the maths stays
 honest, and every screen that touches money keeps its reality check.
 
 ## ⚠️ Responsible play
@@ -174,6 +207,15 @@ fun, help exists — among others: [BeGambleAware](https://www.begambleaware.org
 [Joueurs Info Service](https://www.joueurs-info-service.fr) (FR),
 [SOS Jeux](https://www.joueurssosjeux.be) (BE), [NCPG](https://www.ncpgambling.org) (US).
 
+Every page and every command shows an **18+ warning**. Where a country
+prescribes the wording it is quoted verbatim: France (arrêté du 4 mars 2026)
+and Belgium (arrêté royal du 27 février 2023, French and Dutch). Elsewhere a
+plain warning in your language is shown. The country comes from your browser
+language (`fr-BE`, `fr-FR`…) or locale (`LC_ALL=fr_BE.UTF-8`); force it with
+`LFL_COUNTRY=be`. Wordings live in `src/Web/GamblingNotice.php`: if your
+country requires one, a pull request with the official source is welcome.
+
 ## 📄 License
 
-[MIT](LICENSE) — do whatever you want, just keep the notice.
+[MIT](LICENSE). The Archivo font is under the
+[SIL Open Font License](public/fonts/OFL.txt).

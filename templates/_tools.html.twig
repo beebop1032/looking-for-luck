@@ -1,0 +1,15 @@
+{# Language picker, theme toggle and GitHub link, on the dark masthead. #}
+<form class="lang" method="get" action="{{ app.request.pathInfo }}">
+    {% for key, value in app.request.query.all %}{% if key != 'lang' and value is not iterable %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+    <label class="visually-hidden" for="lang-select">{{ 'tools.language'|trans }}</label>
+    <select id="lang-select" name="lang" onchange="this.form.submit()">
+        {% for code, name in languages %}<option value="{{ code }}" lang="{{ code }}" {{ code == app.request.locale ? 'selected' }}>{{ name }}</option>{% endfor %}
+    </select>
+    <svg class="icon"><use href="#i-chevron"/></svg>
+    <noscript><button class="chip-btn">OK</button></noscript>
+</form>
+<button type="button" class="chip-btn chip-btn--icon theme-toggle" data-theme-toggle title="{{ 'tools.theme'|trans }}" aria-label="{{ 'tools.theme'|trans }}">
+    <svg class="icon when-light"><use href="#i-moon"/></svg>
+    <svg class="icon when-dark"><use href="#i-sun"/></svg>
+</button>
+<a class="chip-btn" href="{{ repo_url }}" aria-label="{{ 'tools.star'|trans }}"><svg class="icon icon--fill"><use href="#i-github"/></svg><span class="github-label">{{ 'tools.star'|trans }}</span></a>

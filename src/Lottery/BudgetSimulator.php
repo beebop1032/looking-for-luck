@@ -27,6 +27,7 @@ final class BudgetSimulator
      *     expectedNet: float,
      *     median: float,
      *     percentiles: array<string,float>,
+     *     wonBack: array{median: float, p5: float, p95: float},
      *     probabilityPositive: float,
      *     best: float,
      *     worst: float,
@@ -79,6 +80,9 @@ final class BudgetSimulator
             throw new \LogicException('No trajectories were simulated.');
         }
 
+        // Prizes won back, easier to read than a net result (and never negative).
+        $wonBack = static fn (float $percentile): float => max(0.0, Percentile::of($nets, $percentile) + $totalCost);
+
         return [
             'gridsPlayed' => $gridsPlayed,
             'totalCost' => $totalCost,
@@ -91,10 +95,52 @@ final class BudgetSimulator
                 'p75' => Percentile::of($nets, 75.0),
                 'p95' => Percentile::of($nets, 95.0),
             ],
+            'wonBack' => ['median' => $wonBack(50.0), 'p5' => $wonBack(5.0), 'p95' => $wonBack(95.0)],
             'probabilityPositive' => $positive / $simulations,
             'best' => $nets[array_key_last($nets)],
             'worst' => $nets[0],
             'simulations' => $simulations,
+        ];
+    }
+
+    /**
+     * Chances over a whole period of play: for each prize tier, the
+     * probability of winning it at least once over $gridsPlayed grids, and
+     * how many times it is won on average. Exact, no simulation:
+     * P(at least once) = 1 − (1 − p)^n, computed with log1p for tiny p.
+     *
+     * @return array{
+     *     any: array{atLeastOnce: float, expectedWins: float, probabilityPerGrid: float},
+     *     tiers: list<array{rank: int, main: int, bonus: int, averagePrize: float, probabilityPerGrid: float, atLeastOnce: float, expectedWins: float}>
+     * }
+     */
+    public function chances(int $gridsPlayed, ?PrizeTable $prizeTable = null): array
+    {
+        if ($gridsPlayed < 0) {
+            throw new \InvalidArgumentException('The number of grids cannot be negative.');
+        }
+
+        $table = $prizeTable ?? $this->prizeTable;
+        $atLeastOnce = static fn (float $p): float => $p >= 1.0 ? 1.0 : 1.0 - exp($gridsPlayed * log1p(-$p));
+
+        $tiers = [];
+        foreach ($table->ranks() as $rank) {
+            $tiers[] = [
+                'rank' => $rank['rank'],
+                'main' => $rank['main'],
+                'bonus' => $rank['bonus'],
+                'averagePrize' => $rank['averagePrize'],
+                'probabilityPerGrid' => $rank['probability'],
+                'atLeastOnce' => $atLeastOnce($rank['probability']),
+                'expectedWins' => $gridsPlayed * $rank['probability'],
+            ];
+        }
+
+        $any = $table->anyWinProbability();
+
+        return [
+            'any' => ['atLeastOnce' => $atLeastOnce($any), 'expectedWins' => $gridsPlayed * $any, 'probabilityPerGrid' => $any],
+            'tiers' => $tiers,
         ];
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Euromillions\DrawRepository;
+use App\Intl\Format;
 use App\Lottery\GridGenerator;
 use App\Lottery\PopularityFilter;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -22,6 +23,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class EuromillionsPredictCommand extends Command
 {
+    use TranslatesOutput;
+
     public function __construct(
         private readonly GridGenerator $generator,
         private readonly PopularityFilter $filter,
@@ -45,6 +48,8 @@ dates, sequences, visual patterns, multiples, combinations already drawn).
 <comment>It does not change your odds of winning</comment> — they are identical for every
 grid — but if you do win a big prize, you are less likely to split it with
 other players.
+
+Output language: --locale=fr (or LFL_LOCALE / LC_ALL); en, fr, nl, es, de.
 HELP);
     }
 
@@ -54,10 +59,12 @@ HELP);
 
         $count = InputValue::int($input->getArgument('count'));
         if ($count < 1 || $count > 100) {
-            $io->error('The number of grids must be between 1 and 100.');
+            $io->error($this->t('predict.count_range'));
 
             return Command::INVALID;
         }
+
+        Ui::banner($output, $this->t('predict.title', ['count' => $count]), $this->t('predict.subtitle'));
 
         $filter = null;
         if (true !== $input->getOption('no-filter')) {
@@ -65,38 +72,42 @@ HELP);
             if (true !== $input->getOption('offline')) {
                 try {
                     $history = $this->repository->all();
-                    $io->text(\sprintf('History loaded: <info>%d draws</info> ("already drawn" filter active).', \count($history)));
+                    $io->text('<fg=gray>'.$this->t('predict.history_loaded', ['count' => Format::integer(\count($history))]).'</>');
                 } catch (\RuntimeException $e) {
-                    $io->warning('History unavailable ('.$e->getMessage().') — the "already drawn" filter is inactive.');
+                    $io->warning($this->t('predict.history_unavailable', ['message' => $e->getMessage()]));
                 }
             }
             $filter = $this->filter->withHistory($history);
+        } else {
+            $io->text('<fg=gray>'.$this->t('predict.filter_disabled').'</>');
         }
 
         $result = $this->generator->generate($count, $filter);
 
-        $io->title(\sprintf('%d EuroMillions grid(s) — cryptographically secure draw', $count));
-
-        $rows = [];
+        $io->newLine();
         foreach ($result['grids'] as $index => $grid) {
-            $rows[] = [$index + 1, $grid->formatMain(), $grid->formatBonus()];
+            $io->writeln(\sprintf('  <fg=gray>%3d</>   %s', $index + 1, Ui::grid($grid)));
+            $io->newLine();
         }
-        $io->table(['#', 'Numbers', 'Stars'], $rows);
 
-        if ([] !== $result['rejected']) {
-            $io->section('Combinations rejected by the anti-sharing filter');
-            arsort($result['rejected']);
-            foreach ($result['rejected'] as $reason => $nb) {
-                $io->text(\sprintf(' · %d × %s', $nb, $reason));
+        if ([] !== $result['rejectedGrids']) {
+            $io->section($this->t('predict.rejected_title', ['count' => $result['rejectedTotal']]));
+            $io->writeln('  <fg=gray>'.$this->t('predict.rejected_text').'</>');
+            $io->newLine();
+            foreach (\array_slice($result['rejectedGrids'], 0, 10) as $rejected) {
+                $io->writeln(\sprintf('        %s', Ui::grid($rejected['grid'])));
+                foreach ($rejected['reasons'] as $reason) {
+                    $io->writeln(\sprintf('        <fg=#ffc83d>↳</> <fg=gray>%s</>', $this->reason($reason)));
+                }
+                $io->newLine();
+            }
+            if ($result['rejectedTotal'] > 10) {
+                $io->writeln('  <fg=gray>'.$this->t('predict.rejected_more', ['count' => $result['rejectedTotal'] - 10]).'</>');
+                $io->newLine();
             }
         }
 
-        $io->note(
-            'This filter does not change your odds of winning: every combination remains '.
-            'exactly as (im)probable as any other (1 in 139,838,160 for the jackpot). '.
-            'It only reduces the risk of splitting a big prize with other players '.
-            'who ticked a "popular" grid.'
-        );
+        Ui::note($output, $this->t('predict.honest', ['odds' => Format::integer(139_838_160)]));
 
         return Command::SUCCESS;
     }

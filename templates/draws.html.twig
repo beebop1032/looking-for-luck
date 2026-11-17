@@ -1,0 +1,74 @@
+{% extends '_lottery.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% set shape = lottery.definition.bonusShape %}
+{% block title %}{{ 'draws.title'|trans }} {{ year }} – {{ lottery.name }}{% endblock %}
+{% block stage_title %}{{ 'draws.title'|trans }}{% endblock %}
+{% block stage_lead %}{{ 'draws.intro'|trans({year: firstYear}) }}{% endblock %}
+{% block content %}
+<section class="block block--wide">
+    <form class="controls">
+        <label>{{ 'draws.year'|trans }}
+            <select name="year" class="w-md" onchange="this.form.submit()">{% for y in years %}<option {{ y == year ? 'selected' }}>{{ y }}</option>{% endfor %}</select>
+        </label>
+        <label>{{ 'draws.test_grid'|trans({bonus: bonus_label(lottery)}) }}
+            <input class="input-grid" name="grid" value="{{ rawGrid }}" placeholder="{{ lottery.gridInput.example }}" autocomplete="off">
+        </label>
+        <button class="btn">{{ 'draws.show'|trans }}</button>
+        {% if grid or gridError %}<a class="btn btn--ghost" href="{{ path('draws', {lottery: lottery.slug, year: year}) }}">{{ 'draws.clear'|trans }}</a>{% endif %}
+    </form>
+    {% if gridError %}
+        <p class="neg small" style="margin-top: 12px">{{ 'flash.grid_invalid'|trans({main: lottery.game.mainPicked, mainPool: lottery.game.mainPool, bonus: lottery.game.bonusPicked, bonusPool: lottery.game.bonusPool, example: lottery.gridInput.example}) }}</p>
+    {% endif %}
+</section>
+
+{% if replay %}
+    <section class="block">
+        <div class="block__head">
+            <h2>{{ 'draws.replay_title'|trans({year: firstYear}) }}</h2>
+            <p>{{ 'draws.replay_text'|trans({price: lottery.game.defaultTicketPrice|money}) }}</p>
+        </div>
+        <div>
+            {{ ui.balls(grid, shape, null, 'lg') }}
+            <dl class="figures" style="margin-top: 22px">
+                <div class="figure"><dt>{{ 'draws.played'|trans }}</dt><dd>{{ replay.draws|integer }}</dd></div>
+                <div class="figure"><dt>{{ 'draws.staked'|trans }}</dt><dd>{{ replay.cost|money(0) }}</dd></div>
+                <div class="figure"><dt>{{ 'draws.won'|trans }}</dt><dd>{{ replay.winnings|money(0) }}</dd></div>
+                <div class="figure"><dt>{{ 'common.net'|trans }}</dt><dd>{{ ui.money(replay.winnings - replay.cost, 0) }}</dd></div>
+            </dl>
+            {% if replay.byRank is not empty %}
+                <p style="margin-top: 18px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center">
+                    {% for rank, n in replay.byRank %}<span class="tag {{ rank <= 6 ? 'tag--gold' }}">{{ 'common.tier_times'|trans({rank: rank, count: n}) }}</span>{% endfor %}
+                </p>
+                {% if replay.best %}<p class="small muted" style="margin-top: 8px">{{ 'draws.best'|trans({rank: replay.best.rank, date: replay.best.date|format_date('long')}) }}</p>{% endif %}
+            {% endif %}
+        </div>
+    </section>
+{% endif %}
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ year }}</h2>
+        <p>{{ 'draws.count'|trans({count: rows|length}) }}</p>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>{{ 'draws.col_date'|trans }}</th><th>{{ 'draws.col_numbers'|trans }}</th>{% if grid %}<th>{{ 'draws.col_matches'|trans }}</th>{% endif %}<th class="num">{{ 'draws.col_jackpot'|trans }}</th><th class="num">{{ 'draws.col_winners'|trans }}</th></tr></thead>
+            <tbody>
+            {% for row in rows %}
+                <tr class="{{ row.rank ? 'win' }}">
+                    <td class="nowrap">{{ row.draw.date|format_date(pattern: 'EEE d MMM') }}</td>
+                    <td>{{ ui.balls(row.draw.grid, shape, grid, 'sm') }}</td>
+                    {% if grid %}
+                        <td class="nowrap">{{ 'common.matches'|trans({main: row.matches.main, bonus: row.matches.bonus}) }} {% if row.rank %}<span class="tag tag--win">{{ 'common.tier'|trans({rank: row.rank}) }}</span>{% endif %}</td>
+                    {% endif %}
+                    <td class="num nowrap">{{ row.draw.jackpot ? row.draw.jackpot|money(0) : '–' }}</td>
+                    <td class="num">{% if row.draw.jackpotWinners is not null %}{{ row.draw.jackpotWinners ? '🎉 ' ~ row.draw.jackpotWinners : '0' }}{% else %}–{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5" class="muted">{{ 'draws.none'|trans({year: year}) }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

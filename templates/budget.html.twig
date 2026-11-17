@@ -1,0 +1,76 @@
+{% extends '_lottery.html.twig' %}
+{% import '_macros.html.twig' as ui %}
+{% block title %}{{ 'nav.budget'|trans }} – {{ lottery.name }}{% endblock %}
+{% block stage_title %}{{ 'budget.heading'|trans }}{% endblock %}
+{% block stage_lead %}{{ 'budget.lead'|trans }}{% endblock %}
+{% block content %}
+<section class="block block--wide">
+    <form class="controls">
+        <label>{{ 'budget.years'|trans }} <input type="number" name="years" min="1" max="80" value="{{ params.years }}" class="w-sm"></label>
+        <label>{{ 'budget.grids'|trans }} <input type="number" name="grids" min="1" max="100" value="{{ params.grids }}" class="w-sm"></label>
+        <label>{{ 'budget.price'|trans }} <input type="number" name="price" step="0.05" min="0.5" max="50" value="{{ params.price }}" class="w-sm"></label>
+        <label>{{ 'budget.jackpot'|trans }} <input type="number" name="jackpot" step="1000000" min="{{ lottery.game.minimumJackpot|round }}" max="{{ maxJackpot|round }}" value="{{ params.jackpot|round }}" style="width: 11em"></label>
+        <button class="btn">{{ 'budget.simulate'|trans }}</button>
+    </form>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'budget.spend_title'|trans }}</h2>
+        <p>{{ 'budget.spend_text'|trans({grids: params.grids, price: params.price|money, draws: lottery.game.drawsPerWeek}) }}</p>
+    </div>
+    <dl class="figures">
+        <div class="figure"><dt>{{ 'budget.per_week'|trans }}</dt><dd>{{ spend.week|money }}</dd></div>
+        <div class="figure"><dt>{{ 'budget.per_year'|trans }}</dt><dd>{{ spend.year|money(0) }}</dd></div>
+        <div class="figure"><dt>{{ 'budget.over_period'|trans({years: params.years}) }}</dt><dd>{{ spend.total|money(0) }}<small>{{ 'budget.grids_played'|trans({count: result.gridsPlayed|integer}) }}</small></dd></div>
+    </dl>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'budget.chances_title'|trans }}</h2>
+        <p>{{ 'budget.chances_text'|trans({years: params.years, count: result.gridsPlayed|integer}) }}</p>
+    </div>
+    <div>
+        <dl class="figures">
+            <div class="figure"><dt>{{ 'budget.any_prize'|trans }}</dt><dd>{{ ui.chance(chances.any.atLeastOnce) }}<small>{{ 'budget.any_prize_count'|trans({count: chances.any.expectedWins|num(chances.any.expectedWins < 10 ? 1 : 0)}) }}</small></dd></div>
+            {% set top = chances.tiers|first %}
+            <div class="figure"><dt>{{ 'budget.jackpot_chance'|trans }}</dt><dd>{{ ui.chance(top.atLeastOnce) }}<small>{{ 'budget.jackpot_per_draw'|trans({odds: (1 / top.probabilityPerGrid)|integer}) }}</small></dd></div>
+        </dl>
+        <p class="small muted" style="margin-top: 14px; max-width: 64ch">{{ 'budget.any_note'|trans }}</p>
+        <div class="table-wrap" style="margin-top: 22px">
+            <table>
+                <thead><tr><th>{{ 'budget.col_tier'|trans }}</th><th>{{ 'budget.col_match'|trans }}</th><th class="num">{{ 'budget.col_prize'|trans }}</th><th class="num">{{ 'budget.col_at_least_once'|trans({years: params.years}) }}</th><th class="num">{{ 'budget.col_times'|trans }}</th></tr></thead>
+                <tbody>
+                {% for t in chances.tiers %}
+                    <tr>
+                        <td>{{ t.rank }}</td>
+                        <td class="nowrap">{{ 'common.matches'|trans({main: t.main, bonus: t.bonus}) }}</td>
+                        <td class="num nowrap">{{ t.averagePrize|money(0) }}</td>
+                        <td class="num nowrap"><strong>{{ ui.chance(t.atLeastOnce) }}</strong></td>
+                        <td class="num nowrap muted">{{ t.expectedWins >= 0.1 ? t.expectedWins|num(t.expectedWins < 10 ? 1 : 0) : '< ' ~ 0.1|num(1) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="block">
+    <div class="block__head">
+        <h2>{{ 'budget.back_title'|trans }}</h2>
+        <p>{{ 'budget.back_text'|trans({sims: params.simulations|integer}) }}</p>
+    </div>
+    <div>
+        <dl class="figures">
+            <div class="figure"><dt>{{ 'budget.staked'|trans }}</dt><dd>{{ spend.total|money(0) }}</dd></div>
+            <div class="figure"><dt>{{ 'budget.back_typical'|trans }}</dt><dd>{{ back.median|money(0) }}</dd></div>
+            <div class="figure"><dt>{{ 'budget.loss_typical'|trans }}</dt><dd class="neg">{{ (spend.total - back.median)|money(0) }}</dd></div>
+        </dl>
+        <p style="margin-top: 20px; max-width: 64ch">{{ 'budget.back_range'|trans({p5: back.p5|money(0), p95: back.p95|money(0), staked: spend.total|money(0)}) }}</p>
+        <p style="margin-top: 8px; max-width: 64ch">{{ 'budget.profit_lives'|trans({percent: (100 * result.probabilityPositive)|num(2)}) }}</p>
+        <div class="callout" style="margin-top: 22px; max-width: 64ch"><strong>{{ 'budget.average_title'|trans }}</strong> {{ 'budget.average_text'|trans({percent: (100 * result.expectedPrizePerGrid / params.price)|num(0)}) }}</div>
+    </div>
+</section>
+{% endblock %}
