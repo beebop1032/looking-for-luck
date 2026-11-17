@@ -28,6 +28,9 @@ parameters:
     # no consent banner. When set, nothing is loaded until the visitor accepts.
     app.ga4_id: '%env(default:app.default_ga4_id:LFL_GA4_ID)%'
     app.default_ga4_id: ''
+    # Or a Google Tag Manager container (GTM-…), behind the same consent banner.
+    app.gtm_id: '%env(default:app.default_gtm_id:LFL_GTM_ID)%'
+    app.default_gtm_id: ''
 
     # On the roadmap, waiting for a contributor (shown in the web interface).
     app.planned_lotteries:

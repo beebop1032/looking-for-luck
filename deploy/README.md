@@ -37,7 +37,7 @@ kept.
 | `LFL_DOMAIN` | The site's address. |
 | `APP_SECRET` | Generated on the first deployment; keep it. |
 | `LFL_GRIDS` | `browser` (default here): each visitor keeps their grids in a cookie of their own browser, as a public site has no accounts. `server`: one list shared by everyone, for a private install only. |
-| `LFL_GA4_ID` | Optional Google Analytics 4 ID, behind a consent banner. |
+| `LFL_GA4_ID` / `LFL_GTM_ID` | Optional Google Analytics 4 ID or Tag Manager container, behind a consent banner. |
 | `LFL_COUNTRY` | Optional country of the mandatory gambling warning (`be`, `fr`…). |
 
 ## Already running a web server on 80/443?

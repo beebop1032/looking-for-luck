@@ -340,18 +340,33 @@ final class PagesTest extends WebTestCase
         self::assertSelectorExists('[data-consent-choice="denied"]');
         self::assertSelectorTextContains('[data-consent]', 'Google Analytics');
         self::assertSelectorExists('.footer [data-consent-open]');
-        self::assertStringContainsString('"G-TEST1234"', $html);
+        self::assertStringContainsString('{"type":"ga4","id":"G-TEST1234"}', $html);
         // The tag is only injected by the script, never as a static <script src>.
+        self::assertSelectorNotExists('script[src*="googletagmanager"]');
+    }
+
+    public function testATagManagerContainerWaitsForConsentToo(): void
+    {
+        $_SERVER['LFL_GTM_ID'] = 'GTM-K2HS92V7';
+        try {
+            $this->client->request('GET', '/');
+        } finally {
+            unset($_SERVER['LFL_GTM_ID']);
+        }
+
+        self::assertSelectorExists('[data-consent][hidden]');
+        self::assertStringContainsString('{"type":"gtm","id":"GTM-K2HS92V7"}', (string) $this->client->getResponse()->getContent());
         self::assertSelectorNotExists('script[src*="googletagmanager"]');
     }
 
     public function testAMalformedAnalyticsIdIsIgnored(): void
     {
         $_SERVER['LFL_GA4_ID'] = 'G-1"</script><script>alert(1)';
+        $_SERVER['LFL_GTM_ID'] = 'GTM-1"</script>';
         try {
             $this->client->request('GET', '/');
         } finally {
-            unset($_SERVER['LFL_GA4_ID']);
+            unset($_SERVER['LFL_GA4_ID'], $_SERVER['LFL_GTM_ID']);
         }
 
         self::assertSelectorNotExists('[data-consent]');

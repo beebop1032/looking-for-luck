@@ -17,6 +17,7 @@ services:
       # No accounts on a public site: each visitor keeps their grids in their own browser.
       - LFL_GRIDS=${LFL_GRIDS:-browser}
       - LFL_GA4_ID=${LFL_GA4_ID:-}
+      - LFL_GTM_ID=${LFL_GTM_ID:-}
       - LFL_COUNTRY=${LFL_COUNTRY:-}
       - LFL_LOCALE=${LFL_LOCALE:-}
       # The proxy in front (Caddy on the Docker network, or the host's web server through

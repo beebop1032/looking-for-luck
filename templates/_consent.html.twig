@@ -1,6 +1,6 @@
-{# Google Analytics 4, only for a deployment that sets LFL_GA4_ID, and only
-   once the visitor has accepted: before that, nothing is loaded from Google
-   and no cookie is set. The choice is kept in localStorage; the "Cookies"
+{# Google Analytics 4 or Google Tag Manager, only for a deployment that sets
+   LFL_GA4_ID or LFL_GTM_ID, and only once the visitor has accepted: before
+   that, nothing is loaded from Google and no cookie is set. The choice is kept in localStorage; the "Cookies"
    link of the footer reopens the banner, and refusing removes GA cookies. #}
 <div class="consent" data-consent hidden role="region" aria-label="{{ 'consent.title'|trans }}">
     <div class="consent__inner wrap">
@@ -13,7 +13,7 @@
 </div>
 <script>
     (function () {
-        var id = {{ ga4_id|json_encode|raw }};
+        var analytics = {{ analytics|json_encode|raw }};
         var key = 'lfl-consent';
         var banner = document.querySelector('[data-consent]');
 
@@ -27,11 +27,18 @@
             if (window.gtag) return;
             window.dataLayer = window.dataLayer || [];
             window.gtag = function () { window.dataLayer.push(arguments); };
-            window.gtag('js', new Date());
-            window.gtag('config', id);
+            // Consent Mode: the tags of a Tag Manager container see the visitor's choice.
+            window.gtag('consent', 'update', { analytics_storage: 'granted' });
             var script = document.createElement('script');
             script.async = true;
-            script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+            if (analytics.type === 'gtm') {
+                window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
+                script.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(analytics.id);
+            } else {
+                window.gtag('js', new Date());
+                window.gtag('config', analytics.id);
+                script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(analytics.id);
+            }
             document.head.appendChild(script);
         }
         function removeAnalyticsCookies() {

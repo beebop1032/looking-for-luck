@@ -48,6 +48,8 @@ final class AppExtension extends AbstractExtension implements GlobalsInterface
         private readonly string $country = '',
         #[Autowire('%app.ga4_id%')]
         private readonly string $ga4Id = '',
+        #[Autowire('%app.gtm_id%')]
+        private readonly string $gtmId = '',
         private readonly ?BrowserGrids $browserGrids = null,
     ) {
     }
@@ -80,10 +82,25 @@ final class AppExtension extends AbstractExtension implements GlobalsInterface
             'languages' => array_intersect_key(self::LANGUAGE_NAMES, array_flip($this->locales)),
             'repo_url' => $this->repositoryUrl,
             'app_version' => $this->version,
-            // Only a well-formed measurement ID reaches the page (it is printed in a script).
             'grids_in_browser' => $this->browserGrids?->enabled() ?? false,
-            'ga4_id' => 1 === preg_match('/^G-[A-Z0-9]{4,20}$/', $this->ga4Id) ? $this->ga4Id : null,
+            'analytics' => $this->analytics(),
         ];
+    }
+
+    /**
+     * The audience measurement of this deployment, if any: a Tag Manager
+     * container wins over a GA4 ID. Only a well-formed ID reaches the page
+     * (it is printed in a script).
+     *
+     * @return array{type: 'gtm'|'ga4', id: string}|null
+     */
+    private function analytics(): ?array
+    {
+        return match (true) {
+            1 === preg_match('/^GTM-[A-Z0-9]{4,12}$/', $this->gtmId) => ['type' => 'gtm', 'id' => $this->gtmId],
+            1 === preg_match('/^G-[A-Z0-9]{4,20}$/', $this->ga4Id) => ['type' => 'ga4', 'id' => $this->ga4Id],
+            default => null,
+        };
     }
 
     /**
